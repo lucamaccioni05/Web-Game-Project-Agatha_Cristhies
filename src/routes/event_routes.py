@@ -23,7 +23,7 @@ async def activate_cards_off_table_event(player_id: int, db: Session = Depends(g
     result = cards_off_table(player_id=player_id, db=db)
  
     await broadcast_game_information(player.game_id)
-    await broadcast_last_discarted_cards(player.game_id)
+    await broadcast_last_discarted_cards(player.player_id)
     return result
 
 @events.put("/event/one_more/{new_secret_player_id},{secret_id}", status_code=200, tags=["Events"])
@@ -49,8 +49,8 @@ async def activate_one_more_event(new_secret_player_id: int, secret_id: int, db:
     await broadcast_game_information(new_secret_player.game_id)
     return updated_secret
 
-@events.put("/event/early_train_paddington/{game_id}", status_code=200, tags=["Events"])
-async def activate_early_train_paddington_event(game_id: int, db: Session = Depends(get_db)):
+@events.put("/event/early_train_paddington/{game_id},{player_id}", status_code=200, tags=["Events"])
+async def activate_early_train_paddington_event(game_id: int, player_id: int, db: Session = Depends(get_db)):
     """
     Activa el evento 'Early Train to Paddington': Toma hasta 6 cartas del mazo y las coloca boca arriba en la pila de descarte.
     """
@@ -59,9 +59,14 @@ async def activate_early_train_paddington_event(game_id: int, db: Session = Depe
     if not game:
         raise HTTPException(status_code=404, detail="Game not found.")
     
+    # Validar player_id
+    player = db.query(Player).filter(Player.player_id == player_id, Player.game_id == game_id).first()
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found in this game.")
+    
     result = await early_train_paddington(game_id=game_id, db=db)
     await broadcast_game_information(game_id)
-    await broadcast_last_discarted_cards(game_id)
+    await broadcast_last_discarted_cards(player_id)
     return result
 
 @events.put("/event/look_into_ashes/{player_id},{card_id}", status_code=200, tags=["Events"], response_model=Card_Response)
@@ -77,19 +82,24 @@ async def activate_look_into_ashes_event(player_id: int, card_id: int, db: Sessi
     
     taken_card = look_into_ashes(player_id=player_id, card_id=card_id, db=db)
     await broadcast_game_information(player.game_id)
-    await broadcast_last_discarted_cards(player.game_id)
+    await broadcast_last_discarted_cards(player_id)
     return taken_card
 
-@events.put ("/event/delay_escape/{game_id}", status_code=  200,response_model= list[Card_Response] ,tags = ["Events"]) 
-async def activate_delay_murderers_escape (game_id :int, discard_cards : Discard_List_Request , db : Session = Depends(get_db)) : 
+@events.put ("/event/delay_escape/{game_id},{player_id}", status_code=  200,response_model= list[Card_Response] ,tags = ["Events"]) 
+async def activate_delay_murderers_escape (game_id :int, player_id: int, discard_cards : Discard_List_Request , db : Session = Depends(get_db)) : 
     game = db.query(Game).filter(Game.game_id == game_id).first()
     if not game : 
         raise HTTPException(status_code=404, detail="Game not found.")
+    
+    # Validar player_id
+    player = db.query(Player).filter(Player.player_id == player_id, Player.game_id == game_id).first()
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found in this game.")
+    
     discarded_cards_ids = discard_cards.card_ids
     discarded_cards = delay_the_murderers_escape(game_id, discarded_cards_ids ,db)
     await broadcast_game_information(game_id)
-    await broadcast_last_discarted_cards(game_id)
-
+    await broadcast_last_discarted_cards(player_id)
     return discarded_cards
 
 @events.post("/event/card_trade/initiate/{trader_id},{tradee_id}", status_code=200, tags=["Events"])
