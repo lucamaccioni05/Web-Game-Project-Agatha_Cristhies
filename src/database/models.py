@@ -35,7 +35,7 @@ class Player(Base):
     secrets = relationship("Secrets", back_populates="player")
     sets = relationship("Set" , back_populates="player")
     social_disgrace = Column(Boolean, default=False)  # Nueva columna para Social Disgrace
-    isSelected = Column(Boolean, default = False)
+    pending_action = Column(String(50), nullable=True)
 
 class Card(Base):
     __tablename__ = 'cards'
@@ -98,4 +98,16 @@ class Set(Base):
     game = relationship("Game", back_populates="sets")
     detective = relationship("Detective" , back_populates="set")
 
-
+class ActiveTrade(Base):
+    __tablename__ = "active_trades"
+    
+    id = Column(Integer, primary_key=True)
+    game_id = Column(Integer, ForeignKey("games.game_id"))
+    
+    # Los dos jugadores involucrados
+    player_one_id = Column(Integer, ForeignKey("players.player_id"))
+    player_two_id = Column(Integer, ForeignKey("players.player_id"))
+    
+    # Las cartas que han seleccionado (aquí resolvemos el deadlock)
+    player_one_card_id = Column(Integer, ForeignKey("cards.card_id"), nullable=True)
+    player_two_card_id = Column(Integer, ForeignKey("cards.card_id"), nullable=True)

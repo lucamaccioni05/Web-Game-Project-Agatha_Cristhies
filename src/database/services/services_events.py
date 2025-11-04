@@ -4,7 +4,7 @@ from sqlalchemy import desc, func
 from src.database.database import SessionLocal, get_db
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from src.database.models import Player, Card , Detective , Event, Secrets, Game, Set
+from src.database.models import Player, Card , Detective , Event, Secrets, Game, Set, ActiveTrade
 from src.database.services.services_games import finish_game
 from src.database.services.services_secrets import steal_secret as steal_secret_service
 from typing import List 
@@ -132,52 +132,117 @@ def early_train_paddington(game_id: int, db: Session):
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error executing 'Early Train to Paddington' event: {str(e)}")
 
-
-def initiate_card_trade(trader_id: int, tradee_id: int, db: Session):
+def _execute_trade(trader_id: int, trader_card_id: int, tradee_id: int, tradee_card_id: int, db: Session):
     """
-    Marca a dos jugadores con isSelected = True para que el frontend sepa que deben elegir una carta.
+    Helper INTERNO: Intercambia la propiedad de dos cartas.
     """
-    trader = db.query(Player).filter(Player.player_id == trader_id).first()
-    tradee = db.query(Player).filter(Player.player_id == tradee_id).first()
-
-    if not trader or not tradee:
-        raise HTTPException(status_code=404, detail="One or both players not found.")
-
-    try:
-        trader.isSelected = True
-        tradee.isSelected = True
-        db.commit()
-        db.refresh(trader)
-        db.refresh(tradee)
-        return {"message": f"Card trade initiated between {trader.name} and {tradee.name}."}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail=f"Error initiating card trade: {str(e)}")
-
-
-def finalize_card_trade(trader_id: int, trader_card_id: int, tradee_id: int, tradee_card_id: int, db: Session):
-    """
-    Intercambia las dos cartas seleccionadas y resetea isSelected a False.
-    """
-    trader = db.query(Player).filter(Player.player_id == trader_id).first()
-    tradee = db.query(Player).filter(Player.player_id == tradee_id).first()
     trader_card = db.query(Card).filter(Card.card_id == trader_card_id, Card.player_id == trader_id).first()
     tradee_card = db.query(Card).filter(Card.card_id == tradee_card_id, Card.player_id == tradee_id).first()
 
-    if not all([trader, tradee, trader_card, tradee_card]):
-        raise HTTPException(status_code=404, detail="Invalid player or card IDs provided.")
+    if not all([trader_card, tradee_card]):
+        raise HTTPException(status_code=404, detail="Una o ambas cartas no se encontraron durante el intercambio final.")
+
+    trader_card.player_id = tradee_id
+    tradee_card.player_id = trader_id
+    # No hay commit aquí, se maneja afuera
+
+
+# --- ¡FUNCIÓN CORREGIDA! ---
+def initiate_card_trade(trader_id: int, tradee_id: int, card_id: int, db: Session):
+    """
+    Servicio: Crea ActiveTrade, setea pending_action Y descarta la carta de evento.
+    ¡AHORA ES ATÓMICO!
+    """
+    trader = db.query(Player).filter(Player.player_id == trader_id).first()
+    tradee = db.query(Player).filter(Player.player_id == tradee_id).first()
+    card_to_discard = db.query(Card).filter(Card.card_id == card_id, Card.player_id == trader_id).first()
+    
+    if not trader or not tradee or not card_to_discard:
+        raise HTTPException(status_code=404, detail="Jugador, oponente o carta de evento no encontrados.")
+    
+    try:
+        # 1. Crear el registro de la acción
+        new_trade = ActiveTrade(
+            game_id=trader.game_id,
+            player_one_id=trader.player_id,
+            player_two_id=tradee.player_id
+        )
+        db.add(new_trade)
+        
+        # 2. Asignar la acción pendiente
+        trader.pending_action = "SELECT_TRADE_CARD"
+        tradee.pending_action = "SELECT_TRADE_CARD"
+        
+        # 3. Descartar la carta de evento (¡NUEVO!)
+        card_to_discard.dropped = True
+        card_to_discard.player_id = None
+        # (Añade aquí tu lógica de 'discardInt' si es necesaria)
+        
+        db.commit() # Un solo commit para toda la operación
+    except Exception as e:
+        db.rollback() # Revierte TODO (trade y descarte) si algo falla
+        raise HTTPException(status_code=400, detail=f"Error iniciando el trade: {str(e)}")
+    
+    return {"message": "Trade initiated and card discarded."}
+
+
+# --- (Tu función select_card_for_trade_service ya está bien como la tenías) ---
+def select_card_for_trade_service(player_id: int, card_id: int, db: Session):
+    """
+    Servicio: Un jugador selecciona una carta para el trade.
+    Si ambos jugadores han seleccionado, ejecuta el trade llamando a _execute_trade.
+    """
+    player = db.query(Player).filter(Player.player_id == player_id).first()
+    if not player:
+        raise HTTPException(status_code=404, detail="Jugador no encontrado.")
+
+    if player.pending_action not in ["SELECT_TRADE_CARD", "WAITING_FOR_TRADE_PARTNER"]:
+        raise HTTPException(status_code=400, detail="No es una acción válida para este jugador.")
+
+    trade = db.query(ActiveTrade).filter(
+        ActiveTrade.game_id == player.game_id,
+        (ActiveTrade.player_one_id == player_id) | (ActiveTrade.player_two_id == player_id)
+    ).first()
+
+    if not trade:
+        raise HTTPException(status_code=404, detail="Trade activo no encontrado.")
 
     try:
-        # Intercambio de dueños
-        trader_card.player_id = tradee_id
-        tradee_card.player_id = trader_id
-
-        # Resetear el estado
-        trader.isSelected = False
-        tradee.isSelected = False
+        if trade.player_one_id == player_id:
+            if trade.player_one_card_id:
+                 raise HTTPException(status_code=400, detail="Carta ya seleccionada.")
+            trade.player_one_card_id = card_id
+        else:
+            if trade.player_two_card_id:
+                 raise HTTPException(status_code=400, detail="Carta ya seleccionada.")
+            trade.player_two_card_id = card_id
         
+        player.pending_action = "WAITING_FOR_TRADE_PARTNER"
+
+        if trade.player_one_card_id and trade.player_two_card_id:
+            _execute_trade(
+                trader_id=trade.player_one_id,
+                trader_card_id=trade.player_one_card_id,
+                tradee_id=trade.player_two_id,
+                tradee_card_id=trade.player_two_card_id,
+                db=db
+            )
+            
+            player_one = db.query(Player).filter(Player.player_id == trade.player_one_id).first()
+            player_two = db.query(Player).filter(Player.player_id == trade.player_two_id).first()
+            
+            if player_one: player_one.pending_action = None
+            if player_two: player_two.pending_action = None
+            
+            db.delete(trade)
+            
         db.commit()
-        return {"message": "Card trade finalized successfully."}
     except Exception as e:
         db.rollback()
+<<<<<<< Updated upstream
         raise HTTPException(status_code=400, detail=f"Error finalizing card trade: {str(e)}")
+=======
+        raise HTTPException(status_code=400, detail=f"Error al seleccionar carta para trade: {str(e)}")
+
+    return {"message": "Card selected."}
+>>>>>>> Stashed changes
