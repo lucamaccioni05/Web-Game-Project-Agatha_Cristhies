@@ -36,7 +36,7 @@ class Player(Base):
     secrets = relationship("Secrets", back_populates="player")
     sets = relationship("Set" , back_populates="player")
     social_disgrace = Column(Boolean, default=False)  # Nueva columna para Social Disgrace
-    isSelected = Column(Boolean, default = False)
+    pending_action = Column(String(50), nullable=True)
     votes_received = Column (Integer, default = 0)
 
 class Card(Base):

@@ -111,13 +111,17 @@ async def unselect_player(player_id: int, db: Session = Depends(get_db)):
     return None
 
 
-@player.put("/vote/player/{player_id}", status_code=201, tags=["Players"])
-async def vote_player(player_id: int, db: Session = Depends(get_db)):
-    player = db.query(Player).filter(Player.player_id == player_id).first()
-    if not player:
-        raise HTTPException(status_code=404, detail="Player not found")
-    game_id = player.game_id
-    player.votes_received += 1
+@player.put("/vote/player/{player_id_voted},{player_id_voting} ", status_code=201, tags=["Players"])
+async def vote_player(player_id_voting: int, player_id_voted : int,db: Session = Depends(get_db)):
+    player_to_vote = db.query(Player).filter(Player.player_id == player_id_voted).first()
+    player_voting = db.query(Player).filter(Player.player_id == player_id_voting).first()
+    if not player_to_vote:
+        raise HTTPException(status_code=404, detail="Player to vote not found")
+    if not player_voting:
+        raise HTTPException(status_code=404, detail="Player voting not found")
+    game_id = player_to_vote.game_id
+    player_to_vote.votes_received += 1
+    player_voting.pending_action = "WAITING_VOTING_TO_END"
     game = db.query(Game).filter(Game.game_id == game_id).first()
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
@@ -133,12 +137,13 @@ async def vote_player(player_id: int, db: Session = Depends(get_db)):
 
         if winning_player:
 
-            winning_player.isSelected = True
+            winning_player.pending_action = "REVEAL_SECRET"
 
         game.amount_votes = 0
         all_players = db.query(Player).filter(Player.game_id == game_id).all()
         for p in all_players:
             p.votes_received = 0
+            p.pending_action = "Clense"
 
     try:
         db.commit()
