@@ -111,23 +111,43 @@ async def unselect_player(player_id: int, db: Session = Depends(get_db)):
     return None
 
 
-@player.put("/vote/player/{player_id_voted},{player_id_voting} ", status_code=201, tags=["Players"])
-async def vote_player(player_id_voting: int, player_id_voted : int,db: Session = Depends(get_db)):
-    player_to_vote = db.query(Player).filter(Player.player_id == player_id_voted).first()
-    player_voting = db.query(Player).filter(Player.player_id == player_id_voting).first()
+@player.put(
+    "/vote/player/{player_id_voted}/{player_id_voting}",
+    status_code=201,
+    tags=["Players"],
+)
+async def vote_player(
+    player_id_voting: int, player_id_voted: int, db: Session = Depends(get_db)
+):
+    player_to_vote = (
+        db.query(Player).filter(Player.player_id == player_id_voted).first()
+    )
+    player_voting = (
+        db.query(Player).filter(Player.player_id == player_id_voting).first()
+    )
+
     if not player_to_vote:
         raise HTTPException(status_code=404, detail="Player to vote not found")
     if not player_voting:
         raise HTTPException(status_code=404, detail="Player voting not found")
+
     game_id = player_to_vote.game_id
+
+    # 1. Aplicar voto y cambio de estado del votante
     player_to_vote.votes_received += 1
+    # Se pone al jugador en estado de espera
     player_voting.pending_action = "WAITING_VOTING_TO_END"
+
     game = db.query(Game).filter(Game.game_id == game_id).first()
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
+
     game.amount_votes += 1
+
+    # 2. Lógica de fin de votación
     if game.amount_votes == game.players_amount:
 
+        # Obtener el ganador de la votación
         winning_player = (
             db.query(Player)
             .filter(Player.game_id == game_id)
@@ -135,20 +155,33 @@ async def vote_player(player_id_voting: int, player_id_voted : int,db: Session =
             .first()
         )
 
-        if winning_player:
-
-            winning_player.pending_action = "REVEAL_SECRET"
-
+        # Reiniciar contador de votos en el juego
         game.amount_votes = 0
-        all_players = db.query(Player).filter(Player.game_id == game_id).all()
-        for p in all_players:
-            p.votes_received = 0
-            p.pending_action = "Clense"
 
+        all_players = db.query(Player).filter(Player.game_id == game_id).all()
+
+        # Iterar sobre todos para limpiar VOTOS y PENDING_ACTION
+
+        for p in all_players:
+            # Limpiar votos de todos
+            p.votes_received = 0
+
+            if winning_player and p.player_id == winning_player.player_id:
+                p.pending_action = "REVEAL_SECRET"
+            elif p.player_id == game.current_turn and (
+                not winning_player or p.player_id != winning_player.player_id
+            ):
+                p.pending_action = "WAITING_REVEAL_SECRET"
+            else:
+                p.pending_action = "Clense"
     try:
         db.commit()
+        # Esto notifica al frontend a través de WebSockets
         await broadcast_game_information(game_id)
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=400, detail=f"Error selecting player: {str(e)}")
+        raise HTTPException(
+            status_code=400, detail=f"Error seleccionando jugador: {str(e)}"
+        )
+
     return None
