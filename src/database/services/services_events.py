@@ -239,10 +239,6 @@ def select_card_for_trade_service(player_id: int, card_id: int, db: Session):
         db.commit()
     except Exception as e:
         db.rollback()
-<<<<<<< Updated upstream
-        raise HTTPException(status_code=400, detail=f"Error finalizing card trade: {str(e)}")
-=======
         raise HTTPException(status_code=400, detail=f"Error al seleccionar carta para trade: {str(e)}")
 
     return {"message": "Card selected."}
->>>>>>> Stashed changes
