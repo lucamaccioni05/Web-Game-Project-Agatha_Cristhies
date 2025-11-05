@@ -1,8 +1,5 @@
-from fastapi import (
-    APIRouter,
-    Depends,
-    HTTPException,
-)  # te permite definir las rutas o subrutas por separado
+from fastapi import APIRouter, Depends, HTTPException
+ # te permite definir las rutas o subrutas por separado
 from sqlalchemy.orm import Session
 from src.database.database import SessionLocal, get_db
 from src.database.models import Secrets, Player, Game
@@ -17,19 +14,11 @@ def deal_secrets_to_players(game_id: int, db: Session):
     el Cómplice son el mismo jugador.
     """
     players = db.query(Player).filter(Player.game_id == game_id).all()
-    secrets_deck = (
-        db.query(Secrets)
-        .filter(Secrets.game_id == game_id, Secrets.player_id.is_(None))
-        .all()
-    )
+    secrets_deck = (db.query(Secrets).filter(Secrets.game_id == game_id, Secrets.player_id.is_(None)).all())
     if not players:
-        raise HTTPException(
-            status_code=404, detail="No players found for the given game_id"
-        )
+        raise HTTPException(status_code=404, detail="No players found for the given game_id")
     if not secrets_deck:
-        raise HTTPException(
-            status_code=404, detail="No secrets available to deal for the given game_id"
-        )
+        raise HTTPException(status_code=404, detail="No secrets available to deal for the given game_id" )
 
     while True:
         # 1. Barajar las cartas en cada intento
@@ -58,14 +47,9 @@ def deal_secrets_to_players(game_id: int, db: Session):
         db.commit()
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Ocurrió un error al repartir los secretos: {str(e)}",
-        )
+        raise HTTPException(status_code=500,detail=f"Ocurrió un error al repartir los secretos: {str(e)}",)
 
-    return {
-        "message": f"Se repartieron 3 secretos a {len(players)} jugadores en la partida {game_id}."
-    }
+    return {"message": f"Se repartieron 3 secretos a {len(players)} jugadores en la partida {game_id}."}
 
 
 def init_secrets(game_id: int, db: Session = Depends(get_db)):
@@ -76,21 +60,11 @@ def init_secrets(game_id: int, db: Session = Depends(get_db)):
     cards_to_create = num_players * 3 - 1  # una carta es la del asesino
     # Cada jugador recibe 3 secretos, por lo que se crean 3 * número de jugadores
     if num_players > 4:
-        cards_to_create = (
-            cards_to_create - 1
-        )  # si hay mas de 4 jugadores un secreto va a ser el del complice
-        acomplice_card = Secrets(
-            murderer=False,
-            acomplice=True,
-            revelated=False,
-            player_id=None,
-            game_id=game_id,
-        )
+        cards_to_create = (cards_to_create - 1)  # si hay mas de 4 jugadores un secreto va a ser el del complice
+        acomplice_card = Secrets(murderer=False, acomplice=True, revelated=False, player_id=None, game_id=game_id)
         new_secret_list.append(acomplice_card)
     #
-    murderer_card = Secrets(
-        murderer=True, acomplice=False, revelated=False, player_id=None, game_id=game_id
-    )
+    murderer_card = Secrets(murderer=True, acomplice=False, revelated=False, player_id=None, game_id=game_id)
     new_secret_list.append(murderer_card)
 
     for _ in range(cards_to_create):
@@ -129,9 +103,7 @@ def update_social_disgrace(player: Player):
         return
 
     accomplice_revealed = any(s.revelated and s.acomplice for s in player.secrets)
-    all_secrets_revealed = (
-        all(s.revelated for s in player.secrets) if player.secrets else False
-    )
+    all_secrets_revealed = (all(s.revelated for s in player.secrets) if player.secrets else False)
 
     player.social_disgrace = accomplice_revealed or all_secrets_revealed
 
@@ -203,9 +175,7 @@ def steal_secret(target_player_id: int, secret_id: int, db: Session):
     if not secret:
         raise HTTPException(status_code=404, detail="Secret not found")
     if not secret.revelated:
-        raise HTTPException(
-            status_code=400, detail="Secret must be revealed to be stolen"
-        )
+        raise HTTPException(status_code=400, detail="Secret must be revealed to be stolen")
 
     new_owner = db.query(Player).filter(Player.player_id == target_player_id).first()
 

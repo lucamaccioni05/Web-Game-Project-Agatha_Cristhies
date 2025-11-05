@@ -1,13 +1,6 @@
-from fastapi import (
-    APIRouter,
-    Depends,
-    HTTPException,
-)  # te permite definir las rutas o subrutas por separado
+from fastapi import APIRouter,Depends,HTTPException  # te permite definir las rutas o subrutas por separado
 from sqlalchemy.orm import Session
-from src.database.services.services_websockets import (
-    broadcast_game_information,
-    broadcast_player_state,
-)
+from src.database.services.services_websockets import  broadcast_game_information,broadcast_player_state
 from src.database.database import SessionLocal, get_db
 from src.database.models import Game, Player
 from src.schemas.players_schemas import Player_Base
@@ -24,13 +17,9 @@ player = APIRouter()  # ahora el player es lo mismo que hacer app
 
 @player.get("/lobby/players/{game_id}", tags=["Players"])
 def list_players(game_id: int, db: Session = Depends(get_db)):
-    players = (
-        db.query(Player).filter(Player.game_id == game_id).all()
-    )  # .all() me devuelve una lista, si no hay nada devuelve lista vacia
+    players = ( db.query(Player).filter(Player.game_id == game_id).all())  # .all() me devuelve una lista, si no hay nada devuelve lista vacia
     if not players:
-        raise HTTPException(
-            status_code=404, detail="game not found or no players in this game"
-        )
+        raise HTTPException(status_code=404, detail="game not found or no players in this game")
     return players
 
 
@@ -85,7 +74,7 @@ async def select_player(player_id: int, db: Session = Depends(get_db)):
     if not player:
         raise HTTPException(status_code=404, detail="Player not found")
     game_id = player.game_id
-    player.isSelected = True
+    player.pending_action = "REVEAL_SECRET"
     try:
         db.commit()
         await broadcast_player_state(game_id)
@@ -101,7 +90,7 @@ async def unselect_player(player_id: int, db: Session = Depends(get_db)):
     if not player:
         raise HTTPException(status_code=404, detail="Player not found")
     game_id = player.game_id
-    player.isSelected = False
+    player.pending_action = None
     try:
         db.commit()
         await broadcast_player_state(game_id)
@@ -111,20 +100,10 @@ async def unselect_player(player_id: int, db: Session = Depends(get_db)):
     return None
 
 
-@player.put(
-    "/vote/player/{player_id_voted}/{player_id_voting}",
-    status_code=201,
-    tags=["Players"],
-)
-async def vote_player(
-    player_id_voting: int, player_id_voted: int, db: Session = Depends(get_db)
-):
-    player_to_vote = (
-        db.query(Player).filter(Player.player_id == player_id_voted).first()
-    )
-    player_voting = (
-        db.query(Player).filter(Player.player_id == player_id_voting).first()
-    )
+@player.put("/vote/player/{player_id_voted}/{player_id_voting}", status_code=201,tags=["Players"])
+async def vote_player(player_id_voting: int, player_id_voted: int, db: Session = Depends(get_db)):
+    player_to_vote = (db.query(Player).filter(Player.player_id == player_id_voted).first())
+    player_voting = (db.query(Player).filter(Player.player_id == player_id_voting).first())
 
     if not player_to_vote:
         raise HTTPException(status_code=404, detail="Player to vote not found")
@@ -132,19 +111,14 @@ async def vote_player(
         raise HTTPException(status_code=404, detail="Player voting not found")
 
     game_id = player_to_vote.game_id
-
-    # 1. Aplicar voto y cambio de estado del votante
     player_to_vote.votes_received += 1
-    # Se pone al jugador en estado de espera
+    # El jugador espera
     player_voting.pending_action = "WAITING_VOTING_TO_END"
 
     game = db.query(Game).filter(Game.game_id == game_id).first()
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
-
     game.amount_votes += 1
-
-    # 2. Lógica de fin de votación
     if game.amount_votes == game.players_amount:
 
         # Obtener el ganador de la votación
@@ -176,12 +150,9 @@ async def vote_player(
                 p.pending_action = "Clense"
     try:
         db.commit()
-        # Esto notifica al frontend a través de WebSockets
         await broadcast_game_information(game_id)
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=400, detail=f"Error seleccionando jugador: {str(e)}"
-        )
+        raise HTTPException(status_code=400, detail=f"Error seleccionando jugador: {str(e)}")
 
     return None
