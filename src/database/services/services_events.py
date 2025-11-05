@@ -64,7 +64,7 @@ def one_more(receive_secret_player_id: int, secret_id: int, db: Session):
         raise HTTPException(status_code=400, detail=f"Error executing 'One More' event: {str(e)}")
 
 
-def delay_the_murderers_escape(game_id: int, db: Session):
+def delay_the_murderers_escape(game_id: int,discarded_cards_ids : list[int] , db: Session):
     """
     Implementa el efecto de la carta 'Delay the Murderer's Escape!'.
     Toma hasta 5 cartas de la pila de descarte y las devuelve al mazo.
@@ -77,14 +77,15 @@ def delay_the_murderers_escape(game_id: int, db: Session):
     
 
     # Agarrro maximo las ultimas 5 cartas descartadas 
-    last_discarded_cards = db.query(Card).filter(
+    delayed_cards = db.query(Card).filter(
         Card.game_id == game_id,
-        Card.dropped == True
-    ).order_by(desc(Card.discardInt)).limit(5).all()
+        Card.dropped == True,
+        Card.card_id.in_(discarded_cards_ids)
+    ).all()
 
-    if not last_discarded_cards:
+    if not delayed_cards:
         raise HTTPException(status_code=404, detail="No cards found in the discard pile for this game.")
-    for card in last_discarded_cards : 
+    for card in delayed_cards : 
         card.dropped = False 
         card.picked_up = False 
         card.draft = False
@@ -98,32 +99,35 @@ def delay_the_murderers_escape(game_id: int, db: Session):
         raise HTTPException(status_code=400, detail=f"Error executing 'Delay murderer escapes' event: {str(e)}")
     
 
-    return last_discarded_cards
+    return delayed_cards
     
 
 
-def early_train_paddington(game_id: int, db: Session):
+async def early_train_paddington(game_id: int, db: Session):
     """
     Implement the effect of the 'Early Train to Paddington' event.
     """
-    deck = db.query(Card).filter(Card.game_id == game_id, Card.player_id == None, Card.draft == False).all()
-    
+    deck = db.query(Card).filter(Card.game_id == game_id, Card.picked_up == False, Card.draft == False, Card.dropped == False).all()
+    game = db.query(Game).filter(Game.game_id == game_id).first()
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found.")
     if not deck:
         raise HTTPException(status_code=404, detail="Deck not found.")
     
     if len(deck)<6:
-        finish_game(game_id) # se termina el juego si no hay mas cartas en el mazo
+        await finish_game(game_id) # se termina el juego si no hay mas cartas en el mazo
         return {"message": "Not enough cards in the deck. The game has ended."}
     
     random.shuffle(deck)
-    max_discardInt = db.query(func.max(Card.discardInt)).filter(Card.game_id == game_id).scalar() or 0
-    cards_to_discard = deck[:6]
-    for card in cards_to_discard:
-        card.dropped = True
-        card.picked_up = False
-        max_discardInt += 1
-        card.discardInt = max_discardInt # Asigna el siguiente valor en la secuencia
     try:
+        max_discardInt = db.query(func.max(Card.discardInt)).filter(Card.game_id == game_id).scalar() or 0
+        cards_to_discard = deck[:6]
+        for card in cards_to_discard:
+            card.dropped = True
+            card.picked_up = False
+            max_discardInt += 1
+            card.discardInt = max_discardInt # Asigna el siguiente valor en la secuencia
+        game.cards_left -=  6
         db.commit()
         for card in cards_to_discard:
             db.refresh(card)
