@@ -4,8 +4,9 @@ from sqlalchemy import desc, select, true, orm
 from sqlalchemy.orm import Session
 from src.schemas.card_schemas import Card_Response, AllCardsResponse
 from src.database.database import SessionLocal
-from src.database.models import Detective, Game, Player, Card, Event
+from src.database.models import Detective, Game, Player, Card, Event, Secrets
 from src.schemas.games_schemas import Game_Response
+from src.schemas.secret_schemas import Secret_Response
 from src.webSocket.connection_manager import lobbyManager, gameManager
 from src.schemas.players_schemas import Player_Base, Player_State
 import json
@@ -194,3 +195,37 @@ async def broadcast_card_draft(game_id: int):
         )
     finally:
         db.close()
+
+async def broadcast_blackmailed(game_id: int, secret_id : int):
+    db = SessionLocal()
+    try:
+        game = db.query(Game).filter(Game.game_id == game_id).first()
+        if not game:
+            # Si el juego ya no existe, no hacemos nada.
+            print(f"Intento de broadcast para un juego no existente: {game_id}")
+            return
+        secret = db.query(Secrets).filter(Secrets.secret_id == secret_id).first()
+
+        players = (
+            db.query(Player)
+            .options(joinedload(Player.cards), joinedload(Player.secrets))
+            .filter(Player.game_id == game_id)
+            .all()
+        )
+
+        secretResponse = Secret_Response.model_validate(secret).model_dump_json()
+        playersStateResponse = [
+            Player_State.model_validate(player) for player in players
+        ]
+        playersStateResponseJson = jsonable_encoder(playersStateResponse)
+
+        await gameManager.broadcast(
+            json.dumps({"type": "Blackmailed(Secret)", "data": secretResponse}), game_id
+        )
+
+        await gameManager.broadcast(
+            json.dumps({"type": "playersState", "data": playersStateResponseJson}),
+            game_id,
+        )
+    finally:
+        db.close()  # cierro la conecxion para evitar saturacion de conexiones en la bdd

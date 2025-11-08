@@ -8,7 +8,7 @@ from src.database.services.services_cards import only_6 , replenish_draft_pile
 from src.database.services.services_games import finish_game
 from src.schemas.card_schemas import Card_Response, Discard_List_Request
 from src.schemas.secret_schemas import Secret_Response
-from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_game_information , broadcast_player_state, broadcast_card_draft
+from src.database.services.services_websockets import broadcast_blackmailed, broadcast_last_discarted_cards, broadcast_game_information , broadcast_player_state, broadcast_card_draft
 from src.database.services.services_events import cards_off_table, look_into_ashes, one_more, early_train_paddington, delay_the_murderers_escape, point_your_suspicion, end_point_your_suspicion, initiate_card_trade, select_card_for_trade_service
 import random
 
@@ -161,7 +161,7 @@ async def activate_blackmailed(player_id_showing : int, player_id_to_show : int,
     game_id = player_showed.game_id
     player_showing.pending_action = "BLACKMAILED"
     player_showed.pending_action = "BLACKMAILED"
-    Secret = db.query(Secrets).filter(Secrets.secret_id == secret_id).first()
+    secret = db.query(Secrets).filter(Secrets.secret_id == secret_id).first()
     try:
         db.commit()
     except Exception as e:
@@ -170,9 +170,9 @@ async def activate_blackmailed(player_id_showing : int, player_id_to_show : int,
             status_code=400,
             detail=f"Error executing 'Blackmail' event: {str(e)}",
         )
-    broadcast_game_information(game_id)
+    await broadcast_blackmailed(game_id)
 
-    return Secret 
+    return secret 
 
 
 @events.post("/event/blackmailed/deactivate/{player_id_from}, {player_id_to}", status_code= 200, response_model= Secret_Response,  tags = ["Events"])
@@ -192,7 +192,7 @@ async def deactivate_blackmailed(player_id_showing : int, player_id_to_show : in
             status_code=400,
             detail=f"Error executing 'Blackmail' event: {str(e)}",
         )
-    broadcast_game_information(game_id)
+    await broadcast_game_information(game_id)
 
     return None 
 

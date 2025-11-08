@@ -7,41 +7,29 @@ from fastapi import HTTPException
 from src.database.models import Player, Card , Detective , Event, Secrets, Game, Set, ActiveTrade
 from src.database.services.services_games import finish_game
 from src.database.services.services_secrets import steal_secret as steal_secret_service
-from typing import List
-
+from typing import List 
 
 def cards_off_table(player_id: int, db: Session):
     """
     descarta las cartas not so fast de un jugador
     """
-    nsf = (
-        db.query(Event)
-        .filter(
-            Event.name == "Not so fast",
-            Event.player_id == player_id,
-            Event.dropped == False,
-        )
-        .all()
-    )
+    nsf = db.query(Event).filter(Event.name == "Not so fast", Event.player_id == player_id, Event.dropped == False).all()
 
     if not nsf:
         # No hay cartas "Not so fast" para este jugador, no hay nada que hacer
         return {"message": "No 'Not so fast' cards found for this player to discard."}
     try:
         for event in nsf:
-            event.dropped = True
-        db.commit()  # se descartan las cartas nsf del jugador
+            event.dropped = True        
+        db.commit() # se descartan las cartas nsf del jugador
     except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=400, detail=f"Error discarding 'Not so fast' cards: {str(e)}"
-        )
-
+        db.rollback() 
+        raise HTTPException(status_code=400, detail=f"Error discarding 'Not so fast' cards: {str(e)}")
 
 def look_into_ashes(player_id: int, card_id: int, db: Session):
     """
-    mira las ultimas 5 cartas de la pila de descarte y toma una
-    en realidad le llega una card_id del front que. esta la funcion que le muestra las 5
+    mira las ultimas 5 cartas de la pila de descarte y toma una 
+    en realidad le llega una card_id del front que. esta la funcion que le muestra las 5 
     cartas del descarte. entonces en el endpoint que llama esta funcion solo elije una de esas 5 cartas
     y le cambio dueno y dropped por true
     """
@@ -51,21 +39,18 @@ def look_into_ashes(player_id: int, card_id: int, db: Session):
     try:
         card.dropped = False
         card.player_id = player_id
-        card.discardInt = 0  # la carta vuelve a estar en juego
-        card.picked_up = True
+        card.discardInt = 0 #la carta vuelve a estar en juego
+        card.picked_up=True
         db.commit()
         db.refresh(card)
-        return card
+        return card 
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=400, detail=f"Error assigning card to player: {str(e)}"
-        )
-
+        raise HTTPException(status_code=400, detail=f"Error assigning card to player: {str(e)}")
 
 def one_more(receive_secret_player_id: int, secret_id: int, db: Session):
     """
-    Choose one revealed secret card and add it, face-down, to any player's secrets,
+    Choose one revealed secret card and add it, face-down, to any player's secrets, 
     including your own. This may remove social disgrace.
     """
     try:
@@ -76,9 +61,7 @@ def one_more(receive_secret_player_id: int, secret_id: int, db: Session):
         raise e
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=400, detail=f"Error executing 'One More' event: {str(e)}"
-        )
+        raise HTTPException(status_code=400, detail=f"Error executing 'One More' event: {str(e)}")
 
 
 def delay_the_murderers_escape(game_id: int,discarded_cards_ids : list[int] , db: Session):
@@ -89,8 +72,9 @@ def delay_the_murderers_escape(game_id: int,discarded_cards_ids : list[int] , db
     """
 
     game = db.query(Game).filter(Game.game_id == game_id).first()
-    if not game:
+    if not game : 
         raise HTTPException(status_code=404, detail="No game found ")
+    
 
     # Agarrro maximo las ultimas 5 cartas descartadas 
     delayed_cards = db.query(Card).filter(
@@ -105,17 +89,15 @@ def delay_the_murderers_escape(game_id: int,discarded_cards_ids : list[int] , db
         card.dropped = False 
         card.picked_up = False 
         card.draft = False
-        card.player_id = None
-        card.discardInt = -1
-        game.cards_left += 1
-    try:
+        card.player_id = None  
+        card.discardInt = -1 
+        game.cards_left += 1 
+    try : 
         db.commit()
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=400,
-            detail=f"Error executing 'Delay murderer escapes' event: {str(e)}",
-        )
+        raise HTTPException(status_code=400, detail=f"Error executing 'Delay murderer escapes' event: {str(e)}")
+    
 
     return delayed_cards
     
@@ -135,7 +117,7 @@ async def early_train_paddington(game_id: int, db: Session):
     if len(deck)<6:
         await finish_game(game_id) # se termina el juego si no hay mas cartas en el mazo
         return {"message": "Not enough cards in the deck. The game has ended."}
-
+    
     random.shuffle(deck)
     try:
         max_discardInt = db.query(func.max(Card.discardInt)).filter(Card.game_id == game_id).scalar() or 0
@@ -152,48 +134,8 @@ async def early_train_paddington(game_id: int, db: Session):
         return {"message": "Early Train to Paddington event executed successfully."}
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=400,
-            detail=f"Error executing 'Early Train to Paddington' event: {str(e)}",
-        )
+        raise HTTPException(status_code=400, detail=f"Error executing 'Early Train to Paddington' event: {str(e)}")
 
-
-def point_your_suspicion(game_id: int, db: Session = Depends(get_db)):
-    game = db.query(Game).filter(Game.game_id == game_id).first()
-    if not game:
-        raise HTTPException(status_code=404, detail="Game not found.")
-    players = db.query(Player).filter(Player.game_id == game_id).all()
-    if not players : 
-        raise HTTPException(status_code=404, detail="Players not found.")
-    
-    try:
-        for player in players : 
-            player.pending_action = "VOTE"
-        db.commit()
-        return {"message": "Point your Suspicion event executed successfully."}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=400,
-            detail=f"Error executing 'Point Your Suspicion' event: {str(e)}",
-        )
-
-
-def end_point_your_suspicion(game_id: int, db: Session = Depends(get_db)):
-    game = db.query(Game).filter(Game.game_id == game_id).first()
-    if not game:
-        raise HTTPException(status_code=404, detail="Game not found.")
-    game.status = "in course"
-    try:
-        db.commit()
-        return {"message": "Point your Suspicion ending event executed successfully."}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=400,
-            detail=f"Error executing 'Point Your Suspicion' ending event: {str(e)}",
-        )
-        
 def _execute_trade(trader_id: int, trader_card_id: int, tradee_id: int, tradee_card_id: int, db: Session):
     """
     Helper INTERNO: Intercambia la propiedad de dos cartas.
