@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import Secret
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func  
 from src.database.database import SessionLocal, get_db
@@ -6,6 +7,7 @@ from src.database.models import Card , Game , Detective , Event, Secrets, Set, P
 from src.database.services.services_cards import only_6 , replenish_draft_pile
 from src.database.services.services_games import finish_game
 from src.schemas.card_schemas import Card_Response, Discard_List_Request
+from src.schemas.secret_schemas import Secret_Response
 from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_game_information , broadcast_player_state, broadcast_card_draft
 from src.database.services.services_events import cards_off_table, look_into_ashes, one_more, early_train_paddington, delay_the_murderers_escape, point_your_suspicion, end_point_your_suspicion, initiate_card_trade, select_card_for_trade_service
 import random
@@ -149,3 +151,51 @@ async def activate_card_trade_select_card(player_id: int, card_id: int, db: Sess
         await broadcast_game_information(player.game_id)
         
     return result
+
+@events.post("/event/blackmailed/{player_id_from}, {player_id_to}, {secret_id}", status_code= 200, response_model= Secret_Response,  tags = ["Events"])
+async def activate_blackmailed(player_id_showing : int, player_id_to_show : int, secret_id : int, db : Session = Depends (get_db)) :
+    player_showing =  db.query(Player).filter(Player.player_id == player_id_showing).first()
+    player_showed = db.query(Player).filter(Player.player_id == player_id_to_show).first()
+    if not player_showed or player_showing : 
+        raise HTTPException(status_code=404, detail="Players not found.")
+    game_id = player_showed.game_id
+    player_showing.pending_action = "BLACKMAILED"
+    player_showed.pending_action = "BLACKMAILED"
+    Secret = db.query(Secrets).filter(Secrets.secret_id == secret_id).first()
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Error executing 'Blackmail' event: {str(e)}",
+        )
+    broadcast_game_information(game_id)
+
+    return Secret 
+
+
+@events.post("/event/blackmailed/deactivate/{player_id_from}, {player_id_to}", status_code= 200, response_model= Secret_Response,  tags = ["Events"])
+async def activate_blackmailed(player_id_showing : int, player_id_to_show : int, db : Session = Depends (get_db)) :
+    player_showing =  db.query(Player).filter(Player.player_id == player_id_showing).first()
+    player_showed = db.query(Player).filter(Player.player_id == player_id_to_show).first()
+    if not player_showed or player_showing : 
+        raise HTTPException(status_code=404, detail="Players not found.")
+    game_id = player_showed.game_id
+    player_showing.pending_action = None
+    player_showed.pending_action = None
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Error executing 'Blackmail' event: {str(e)}",
+        )
+    broadcast_game_information(game_id)
+
+    return None 
+
+
+
+
