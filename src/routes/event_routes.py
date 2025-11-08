@@ -176,7 +176,7 @@ async def activate_blackmailed(player_id_showing : int, player_id_to_show : int,
 
 
 @events.post("/event/blackmailed/deactivate/{player_id_from}, {player_id_to}", status_code= 200, response_model= Secret_Response,  tags = ["Events"])
-async def activate_blackmailed(player_id_showing : int, player_id_to_show : int, db : Session = Depends (get_db)) :
+async def deactivate_blackmailed(player_id_showing : int, player_id_to_show : int, db : Session = Depends (get_db)) :
     player_showing =  db.query(Player).filter(Player.player_id == player_id_showing).first()
     player_showed = db.query(Player).filter(Player.player_id == player_id_to_show).first()
     if not player_showed or player_showing : 
