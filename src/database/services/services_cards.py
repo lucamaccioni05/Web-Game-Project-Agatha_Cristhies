@@ -240,7 +240,7 @@ def count (game_id: int, db:Session= Depends(get_db)):
     amount = 0
     last_cancelable_event = db.query(Log).filter(Log.game_id == game_id).order_by(Log.created_at.desc()).all()
 
-    if not last_cancelable_event or last_cancelable_event.type != "event":
+    if not last_cancelable_event or last_cancelable_event[0].type != "event":
         return amount
     
     card = db.query(Event).filter(Event.card_id == last_cancelable_event[0].card_id).first()
