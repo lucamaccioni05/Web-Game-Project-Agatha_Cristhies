@@ -18,6 +18,10 @@ from src.database.services.services_games import finish_game
 from src.database.services.services_secrets import steal_secret as steal_secret_service
 from typing import List
 
+# Diccionario temporal en memoria para las selecciones del evento Dead Card Folly
+# Estructura: {game_id: {player_id: card_id}}
+folly_selections = {}
+
 
 def cards_off_table(player_id: int, db: Session):
     """
@@ -344,12 +348,7 @@ def select_card_for_trade_service(player_id: int, card_id: int, db: Session):
 
 
 def initiate_dead_card_folly(player_id: int, game_id: int, card_id: int, db: Session):
-    """
-    Servicio: Inicia el evento 'Dead Card Folly'.
-    - Todos los jugadores quedan en 'SELECT_TRADE_CARD'
-    - El jugador que juega el evento queda en 'SELECT_OPPONENT_CARD'
-    - Se descarta la carta de evento usada.
-    """
+
     # Obtener jugadores y el jugador que usó la carta
     players = db.query(Player).filter(Player.game_id == game_id).all()
     if not players:
@@ -378,9 +377,9 @@ def initiate_dead_card_folly(player_id: int, game_id: int, card_id: int, db: Ses
         # Seteamoss el pending action para cada jugador
         for player in players:
             if player.player_id == player_id:
-                player.pending_action = "SELECT_OPPONENT_CARD"
+                player.pending_action = "SELECT_FOLLY_CARD"
             else:
-                player.pending_action = "SELECT_TRADE_CARD"
+                player.pending_action = "SELECT_FOLLY_CARD"
 
         # Descartamos la carta de evento
         card_to_discard.dropped = True
@@ -394,3 +393,62 @@ def initiate_dead_card_folly(player_id: int, game_id: int, card_id: int, db: Ses
         )
 
     return {"message": "Dead Card Folly iniciado correctamente."}
+
+
+def select_card_for_folly_trade_service(
+    from_player_id: int, to_player_id: int, card_id: int, db: Session
+):
+    """
+    Servicio: Un jugador selecciona una carta para el evento 'Dead Card Folly'.
+    Intercambia directamente la carta seleccionada entre from_player_id y to_player_id.
+    """
+    from_player = db.query(Player).filter(Player.player_id == from_player_id).first()
+    to_player = db.query(Player).filter(Player.player_id == to_player_id).first()
+
+    if not from_player or not to_player:
+        raise HTTPException(
+            status_code=404, detail="Jugador origen o destino no encontrado."
+        )
+
+    # Validar que la carta pertenezca al jugador origen
+    card = (
+        db.query(Card)
+        .filter(Card.card_id == card_id, Card.player_id == from_player_id)
+        .first()
+    )
+    if not card:
+        raise HTTPException(
+            status_code=404,
+            detail="La carta seleccionada no pertenece al jugador origen.",
+        )
+
+    # Verificar que el jugador origen tenga la acción pendiente adecuada
+    if from_player.pending_action not in [
+        "SELECT_FOLLY_CARD",
+        "WAITING_FOR_FOLLY_TRADE",
+    ]:
+        raise HTTPException(
+            status_code=400,
+            detail="El jugador no puede realizar esta acción actualmente.",
+        )
+
+    try:
+        # Transferir la carta directamente al jugador destino
+        card.player_id = to_player_id
+
+        # Actualizar los estados de acción
+        from_player.pending_action = None
+        to_player.pending_action = None
+
+        db.commit()
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Error al seleccionar carta para Dead Card Folly: {str(e)}",
+        )
+
+    return {
+        "message": f"El jugador {from_player.name} pasó la carta '{card.name}' a {to_player.name}."
+    }
