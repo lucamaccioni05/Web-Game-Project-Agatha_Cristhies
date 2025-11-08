@@ -103,7 +103,7 @@ async def broadcast_player_state(game_id: int):
 
 
         
-async def broadcast_last_discarted_cards(player_id : int) : 
+async def broadcast_last_discarted_cards(player_id : int): 
     db = SessionLocal() 
     try : 
         player = db.query(Player).filter(Player.player_id == player_id).first()
@@ -143,7 +143,7 @@ async def broadcast_last_discarted_cards(player_id : int) :
         db.close()   
 
          
-async def broadcast_card_draft(game_id : int) : 
+async def broadcast_card_draft(game_id : int): 
     db = SessionLocal()
     try : 
         polymorphic_loader = orm.with_polymorphic(Card, [Detective, Event])
@@ -170,6 +170,34 @@ async def broadcast_card_draft(game_id : int) :
     finally : 
         db.close()
 
+async def broadcast_last_cancelable_event(card_id : int):
+    db = SessionLocal()
+    try:
+        # Cargar la carta y sus subtipos (Detective/Event)
+        polymorphic_loader = orm.with_polymorphic(Card, [Detective, Event])
+        stmt = select(polymorphic_loader).where(Card.card_id == card_id)
+        card = db.execute(stmt).scalar_one_or_none()
+
+        if not card:
+            raise HTTPException(status_code=404, detail="Card not found")
+
+        game_id = card.game_id
+
+        # 🔹 Validar la carta con Pydantic (usando tu esquema de respuesta)
+        card_adapter = TypeAdapter(AllCardsResponse)
+        card_response = card_adapter.validate_python(card, from_attributes=True)
+
+        # 🔹 Convertir a JSON serializable
+        card_json = jsonable_encoder(card_response)
+
+        # 🔹 Enviar broadcast a todos los jugadores del juego
+        await gameManager.broadcast(json.dumps({
+            "type": "cardResponse",
+            "data": card_json
+        }), game_id)
+
+    finally:
+        db.close()   
  
 
 

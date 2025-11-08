@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Integer, String, Boolean, CheckConstraint , DateTime, Text, JSON, Date 
+from sqlalchemy import Column, ForeignKey, Integer, String, Boolean, CheckConstraint , DateTime, Text, JSON, Date , func
 from sqlalchemy.orm import relationship
 from src.database.database import Base
 import datetime
@@ -19,6 +19,8 @@ class Game(Base):
     cards = relationship("Card", back_populates="game")
     secrets = relationship("Secrets", back_populates="game")
     sets = relationship("Set" , back_populates="game")
+    log = relationship("Log" , back_populates="game")
+
 
 
 class Player(Base):
@@ -49,6 +51,7 @@ class Card(Base):
     game = relationship("Game", back_populates="cards")
     draft = Column(Boolean, default=False)
     discardInt = Column(Integer, default=0) # en caso de ser -1 representara que se jugo delay murderers escape
+    log = relationship("Log" , back_populates="set")
 
     __mapper_args__ = {
         'polymorphic_on': type,
@@ -97,6 +100,7 @@ class Set(Base):
     game_id = Column(Integer, ForeignKey("games.game_id"), nullable=False)  
     game = relationship("Game", back_populates="sets")
     detective = relationship("Detective" , back_populates="set")
+    log = relationship("Log" , back_populates="set")
 
 class ActiveTrade(Base):
     __tablename__ = "active_trades"
@@ -111,3 +115,18 @@ class ActiveTrade(Base):
     # Las cartas que han seleccionado (aquí resolvemos el deadlock)
     player_one_card_id = Column(Integer, ForeignKey("cards.card_id"), nullable=True)
     player_two_card_id = Column(Integer, ForeignKey("cards.card_id"), nullable=True)
+
+
+class Log(Base):
+    __tablename__ = "card_log"
+
+    log_id = Column(Integer , primary_key=True , autoincrement=True)
+    card_id = Column(Integer , ForeignKey("card.card_id" , nullable=True))
+    card = relationship("Card" , back_populates="log")
+    set_id = Column(Integer , ForeignKey("set.set_id" , nullable=True))
+    set = relationship("Set" , back_populates="log")
+    game_id = Column(Integer , ForeignKey("game.game_id" , nullable=False))
+    game = relationship("Game" , back_populates="log")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    type = Column(String(30))
+    
