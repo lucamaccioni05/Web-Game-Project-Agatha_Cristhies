@@ -2,12 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func  
 from src.database.database import SessionLocal, get_db
-from src.database.models import Card , Game , Detective , Event, Secrets, Set, Player
+from src.database.models import Card , Game , Detective , Event, Secrets, Set, Player, ActiveTrade
 from src.database.services.services_cards import only_6 , replenish_draft_pile
 from src.database.services.services_games import finish_game
-from src.schemas.card_schemas import Card_Response
+from src.schemas.card_schemas import Card_Response, Discard_List_Request
 from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_game_information , broadcast_player_state, broadcast_card_draft
-from src.database.services.services_events import cards_off_table, look_into_ashes, one_more, early_train_paddington, delay_the_murderers_escape, point_your_suspicion, end_point_your_suspicion
+from src.database.services.services_events import cards_off_table, look_into_ashes, one_more, early_train_paddington, delay_the_murderers_escape, point_your_suspicion, end_point_your_suspicion, initiate_card_trade, select_card_for_trade_service
 import random
 
 events = APIRouter()
@@ -23,7 +23,7 @@ async def activate_cards_off_table_event(player_id: int, db: Session = Depends(g
     result = cards_off_table(player_id=player_id, db=db)
  
     await broadcast_game_information(player.game_id)
-    await broadcast_last_discarted_cards(player.game_id)
+    await broadcast_last_discarted_cards(player.player_id)
     return result
 
 @events.put("/event/one_more/{new_secret_player_id},{secret_id}", status_code=200, tags=["Events"])
@@ -49,8 +49,8 @@ async def activate_one_more_event(new_secret_player_id: int, secret_id: int, db:
     await broadcast_game_information(new_secret_player.game_id)
     return updated_secret
 
-@events.put("/event/early_train_paddington/{game_id}", status_code=200, tags=["Events"])
-async def activate_early_train_paddington_event(game_id: int, db: Session = Depends(get_db)):
+@events.put("/event/early_train_paddington/{game_id},{player_id}", status_code=200, tags=["Events"])
+async def activate_early_train_paddington_event(game_id: int, player_id: int, db: Session = Depends(get_db)):
     """
     Activa el evento 'Early Train to Paddington': Toma hasta 6 cartas del mazo y las coloca boca arriba en la pila de descarte.
     """
@@ -59,9 +59,14 @@ async def activate_early_train_paddington_event(game_id: int, db: Session = Depe
     if not game:
         raise HTTPException(status_code=404, detail="Game not found.")
     
-    result = early_train_paddington(game_id=game_id, db=db)
+    # Validar player_id
+    player = db.query(Player).filter(Player.player_id == player_id, Player.game_id == game_id).first()
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found in this game.")
+    
+    result = await early_train_paddington(game_id=game_id, db=db)
     await broadcast_game_information(game_id)
-    await broadcast_last_discarted_cards(game_id)
+    await broadcast_last_discarted_cards(player_id)
     return result
 
 @events.put("/event/look_into_ashes/{player_id},{card_id}", status_code=200, tags=["Events"], response_model=Card_Response)
@@ -77,18 +82,24 @@ async def activate_look_into_ashes_event(player_id: int, card_id: int, db: Sessi
     
     taken_card = look_into_ashes(player_id=player_id, card_id=card_id, db=db)
     await broadcast_game_information(player.game_id)
-    await broadcast_last_discarted_cards(player.game_id)
+    await broadcast_last_discarted_cards(player_id)
     return taken_card
 
-@events.put ("/event/delay_escape/{game_id}", status_code=  200,response_model= list[Card_Response] ,tags = ["Events"]) 
-async def activate_delay_murderers_escape (game_id :int, db : Session = Depends(get_db)) : 
+@events.put ("/event/delay_escape/{game_id},{player_id}", status_code=  200,response_model= list[Card_Response] ,tags = ["Events"]) 
+async def activate_delay_murderers_escape (game_id :int, player_id: int, discard_cards : Discard_List_Request , db : Session = Depends(get_db)) : 
     game = db.query(Game).filter(Game.game_id == game_id).first()
     if not game : 
         raise HTTPException(status_code=404, detail="Game not found.")
-    discarded_cards = delay_the_murderers_escape(game_id, db)
+    
+    # Validar player_id
+    player = db.query(Player).filter(Player.player_id == player_id, Player.game_id == game_id).first()
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found in this game.")
+    
+    discarded_cards_ids = discard_cards.card_ids
+    discarded_cards = delay_the_murderers_escape(game_id, discarded_cards_ids ,db)
     await broadcast_game_information(game_id)
-    await broadcast_last_discarted_cards(game_id)
-
+    await broadcast_last_discarted_cards(player_id)
     return discarded_cards
 
 @events.put ("/event/point_your_suspicion/{game_id}", status_code = 200,tags = ["Events"])
@@ -105,5 +116,36 @@ async def ending_point_your_suspicion (game_id : int, db : Session = Depends(get
 
     return pys
 
+# --- ¡RUTA MODIFICADA! ---
+@events.post("/event/card_trade/initiate/{trader_id},{tradee_id},{card_id}", status_code=200, tags=["Events"])
+async def activate_card_trade_initiate(trader_id: int, tradee_id: int, card_id: int, db: Session = Depends(get_db)):
+    """
+    Ruta: Inicia el 'Card Trade', creando la acción y seteando 'pending_action'.
+    """
+    result = initiate_card_trade(
+        trader_id=trader_id, 
+        tradee_id=tradee_id, 
+        card_id=card_id, # <-- Pasa el ID al servicio
+        db=db
+    )
     
-
+    trader = db.query(Player).filter(Player.player_id == trader_id).first()
+    if trader:
+        await broadcast_game_information(trader.game_id)
+    
+    return result
+@events.post("/event/card_trade/select_card/{player_id}/{card_id}", status_code=200, tags=["Events"])
+async def activate_card_trade_select_card(player_id: int, card_id: int, db: Session = Depends(get_db)):
+    """
+    Ruta: Un jugador selecciona una carta para el trade.
+    El servicio maneja la lógica de esperar o ejecutar.
+    """
+    # El servicio maneja toda la lógica
+    result = select_card_for_trade_service(player_id=player_id, card_id=card_id, db=db)
+    
+    # El broadcast se queda aquí
+    player = db.query(Player).filter(Player.player_id == player_id).first()
+    if player:
+        await broadcast_game_information(player.game_id)
+        
+    return result

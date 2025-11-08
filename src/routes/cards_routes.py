@@ -7,6 +7,7 @@ from src.database.services.services_cards import only_6 , replenish_draft_pile
 from src.database.services.services_games import finish_game
 from src.schemas.card_schemas import Card_Response , Detective_Response , Event_Response, Discard_List_Request
 from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_game_information , broadcast_player_state, broadcast_card_draft
+from src.database.services.services_events import early_train_paddington
 import random
 
 card = APIRouter()
@@ -171,7 +172,8 @@ def get_top_discard_pile(game_id: int, db: Session = Depends(get_db)):
 @card.put("/cards/game/drop_list/{player_id}" , status_code=200, tags = ["Cards"], response_model=list[Card_Response])
 async def select_cards_to_discard(player_id: int, discard_request: Discard_List_Request, db: Session = Depends(get_db)):
     card_ids = discard_request.card_ids
-    
+    early_train = 0
+
     if not card_ids:
         raise HTTPException(status_code=400, detail="Se requiere una lista de IDs de cartas.")
 
@@ -200,11 +202,15 @@ async def select_cards_to_discard(player_id: int, discard_request: Discard_List_
         # 4. ITERAR Y ACTUALIZAR
         for card_obj in cards_to_discard:
             card_obj.discardInt = next_discard_int
+            card_obj.player_id = None
             card_obj.dropped = True
             card_obj.picked_up = False
             updated_cards.append(card_obj)
             next_discard_int += 1
-        
+            event = db.query(Event).filter(Event.card_id == card_obj.card_id).first()
+            if event and event.name == "Early train to paddington":
+                early_train += 1
+
         db.commit()
 
         # 5. REFRESCAR Y RETORNAR (Uniformidad: refrescamos los objetos)
@@ -213,6 +219,9 @@ async def select_cards_to_discard(player_id: int, discard_request: Discard_List_
              db.refresh(card_obj)
 
         # 6. BROADCAST (La parte clave para que desaparezcan del frontend)
+        for _ in range(early_train):
+            await early_train_paddington(cards_to_discard[0].game_id, db)
+            await broadcast_game_information(cards_to_discard[0].game_id)
         await broadcast_last_discarted_cards(player_id)
         
         return updated_cards
