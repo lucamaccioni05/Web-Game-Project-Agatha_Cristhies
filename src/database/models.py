@@ -121,11 +121,11 @@ class Log(Base):
     __tablename__ = "card_log"
 
     log_id = Column(Integer , primary_key=True , autoincrement=True)
-    card_id = Column(Integer , ForeignKey("card.card_id" , nullable=True))
+    card_id = Column(Integer , ForeignKey("card.card_id"),nullable=True)
     card = relationship("Card" , back_populates="log")
-    set_id = Column(Integer , ForeignKey("set.set_id" , nullable=True))
+    set_id = Column(Integer , ForeignKey("set.set_id"), nullable=True)
     set = relationship("Set" , back_populates="log")
-    game_id = Column(Integer , ForeignKey("game.game_id" , nullable=False))
+    game_id = Column(Integer , ForeignKey("game.game_id"),nullable=False)
     game = relationship("Game" , back_populates="log")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     type = Column(String(30))

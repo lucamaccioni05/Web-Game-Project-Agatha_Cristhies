@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, func  
 from src.database.database import SessionLocal, get_db
 from src.database.models import Card , Game , Detective , Event, Secrets, Set, Player, ActiveTrade , Log
-from src.database.services.services_cards import only_6 , replenish_draft_pile , cancelable_event, count
+from src.database.services.services_cards import only_6 , replenish_draft_pile , register_cancelable_event, count
 from src.database.services.services_games import finish_game
 from src.schemas.card_schemas import Card_Response, Discard_List_Request
 from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_game_information , broadcast_player_state, broadcast_card_draft , broadcast_last_cancelable_event
@@ -139,7 +139,7 @@ async def activate_card_trade_select_card(player_id: int, card_id: int, db: Sess
 @events.post("/event/Not_so_fast/{card_id}", status_code=200, tags=["Events"])
 async def activate_cancelable_event(card_id: int, db: Session = Depends(get_db)):
 
-    valid = cancelable_event(card_id , db)
+    valid = register_cancelable_event(card_id , db)
     if valid:
         await broadcast_last_cancelable_event(card_id)
     else: 

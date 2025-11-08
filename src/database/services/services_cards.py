@@ -249,6 +249,6 @@ def count (game_id: int, db:Session= Depends(get_db)):
     while(card.name != "Not so fast"):
         amount+=1
         iterador = db.query(Event).filter(Event.card_id == last_cancelable_event[amount].card_id).first()
-        card = db.query(Event).filter(Event.card_id == iterador.card_id).first()
+        card = iterador
         
     return amount
