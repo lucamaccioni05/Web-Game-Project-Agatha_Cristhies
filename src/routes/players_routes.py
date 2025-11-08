@@ -65,7 +65,7 @@ async def select_player (player_id : int, db : Session = Depends(get_db)) :
     if not player:
         raise HTTPException(status_code=404, detail="Player not found")
     game_id = player.game_id
-    player.isSelected = True 
+    player.pending_action = "REVEAL_SECRET" 
     try : 
         db.commit()
         await broadcast_player_state (game_id)
@@ -80,7 +80,7 @@ async def unselect_player (player_id : int, db : Session = Depends(get_db)) :
     if not player:
         raise HTTPException(status_code=404, detail="Player not found")
     game_id = player.game_id
-    player.isSelected = False 
+    player.pending_action = None
     try : 
         db.commit()
         await broadcast_player_state (game_id)
