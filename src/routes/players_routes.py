@@ -1,9 +1,12 @@
-from fastapi import APIRouter,Depends,HTTPException  # te permite definir las rutas o subrutas por separado
+import json
+from fastapi import APIRouter,Depends,HTTPException, Response  # te permite definir las rutas o subrutas por separado
 from sqlalchemy.orm import Session
 from src.database.services.services_websockets import  broadcast_game_information,broadcast_player_state
 from src.database.database import SessionLocal, get_db
 from src.database.models import Game, Player
 from src.schemas.players_schemas import Player_Base
+from src.schemas.chat_schemas import Chat_Base
+from src.webSocket.connection_manager import gameManager
 from src.database.services.services_games import update_players_on_game
 from sqlalchemy import desc, func
 
@@ -156,3 +159,26 @@ async def vote_player(player_id_voting: int, player_id_voted: int, db: Session =
         raise HTTPException(status_code=400, detail=f"Error seleccionando jugador: {str(e)}")
 
     return None
+
+@player.post("/send/chat/{game_id}, {player_id}",status_code= 204)
+async def send_message_chat(game_id :int, messageIn : Chat_Base, player_id : int, db : Session = Depends(get_db)) :
+    player = db.query(Player).filter(Player.player_id == player_id).first()
+    if not player : 
+        raise HTTPException(status_code=404, detail="Player  not found")
+    game = db.query(Game).filter(Game.game_id == game_id).first()
+    if not game : 
+        raise HTTPException(status_code=404, detail="Game  not found")
+    messageToBeSend = {
+        "sender_name" : player.name,
+        "message" : messageIn.message,
+        "sender_id" : player.player_id
+    }
+    try : 
+        await gameManager.broadcast (
+            json.dumps({"type" : "Chat", "data" : messageToBeSend}), game_id
+        )
+    except Exception as e:
+        # Manejar si el broadcast falla, aunque sea no persistente
+        print(f"Error al transmitir chat: {e}")
+        
+    return Response(status_code = 204)
