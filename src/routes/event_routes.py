@@ -118,7 +118,7 @@ async def ending_point_your_suspicion (game_id : int, db : Session = Depends(get
 
     return pys
 
-# --- ¡RUTA MODIFICADA! ---
+
 @events.post("/event/card_trade/initiate/{trader_id},{tradee_id},{card_id}", status_code=200, tags=["Events"])
 async def activate_card_trade_initiate(trader_id: int, tradee_id: int, card_id: int, db: Session = Depends(get_db)):
     """
