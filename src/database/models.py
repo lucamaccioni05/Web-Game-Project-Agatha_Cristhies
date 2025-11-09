@@ -26,9 +26,16 @@ class Game(Base):
     )  # 'esperando jugadores', 'en curso', 'finalizada'
     max_players = Column(Integer, nullable=False)
     min_players = Column(Integer, nullable=False)
+<<<<<<< HEAD
     players_amount = Column(Integer, nullable=False)
     current_turn = Column(Integer, nullable=True)
     cards_left = Column(Integer, nullable=True)
+=======
+    players_amount = Column(Integer,nullable = False)
+    current_turn = Column(Integer, nullable = True)
+    cards_left = Column(Integer , nullable=True)
+    amount_votes = Column (Integer, default = 0)
+>>>>>>> dev
     players = relationship("Player", back_populates="game")
     cards = relationship("Card", back_populates="game")
     secrets = relationship("Secrets", back_populates="game")
@@ -57,6 +64,7 @@ class Player(Base):
         Boolean, default=False
     )  # Nueva columna para Social Disgrace
     pending_action = Column(String(50), nullable=True)
+    votes_received = Column (Integer, default = 0)
 
 
 class Card(Base):

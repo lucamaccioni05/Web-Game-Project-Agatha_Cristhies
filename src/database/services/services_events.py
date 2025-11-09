@@ -223,10 +223,8 @@ def _execute_trade(
 
     trader_card.player_id = tradee_id
     tradee_card.player_id = trader_id
-    # No hay commit aquí, se maneja afuera
 
 
-# --- ¡FUNCIÓN CORREGIDA! ---
 def initiate_card_trade(trader_id: int, tradee_id: int, card_id: int, db: Session):
     """
     Servicio: Crea ActiveTrade, setea pending_action Y descarta la carta de evento.
@@ -267,7 +265,6 @@ def initiate_card_trade(trader_id: int, tradee_id: int, card_id: int, db: Sessio
         card_to_discard.picked_up = False
         card_to_discard.dropped = True
         card_to_discard.player_id = None
-        # (Añade aquí tu lógica de 'discardInt' si es necesaria)
 
         db.commit()  # Un solo commit para toda la operación
     except Exception as e:

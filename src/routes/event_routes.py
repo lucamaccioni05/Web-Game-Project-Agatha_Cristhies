@@ -15,6 +15,7 @@ from src.database.models import (
 from src.database.services.services_cards import only_6, replenish_draft_pile
 from src.database.services.services_games import finish_game
 from src.schemas.card_schemas import Card_Response, Discard_List_Request
+<<<<<<< HEAD
 from src.database.services.services_websockets import (
     broadcast_last_discarted_cards,
     broadcast_game_information,
@@ -32,6 +33,10 @@ from src.database.services.services_events import (
     initiate_dead_card_folly,
     select_card_for_folly_trade_service,
 )
+=======
+from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_game_information , broadcast_player_state, broadcast_card_draft
+from src.database.services.services_events import cards_off_table, look_into_ashes, one_more, early_train_paddington, delay_the_murderers_escape, point_your_suspicion, end_point_your_suspicion, initiate_card_trade, select_card_for_trade_service
+>>>>>>> dev
 import random
 
 events = APIRouter()
@@ -176,6 +181,22 @@ async def activate_delay_murderers_escape(
     await broadcast_last_discarted_cards(player_id)
     return discarded_cards
 
+<<<<<<< HEAD
+=======
+@events.put ("/event/point_your_suspicion/{game_id}", status_code = 200,tags = ["Events"])
+async def activate_point_your_suspicion (game_id : int, db : Session = Depends(get_db)) :
+    pys = point_your_suspicion(game_id, db)
+    await broadcast_game_information(game_id)
+
+    return pys 
+
+@events.put ("/event/end/point_your_suspicion/{game_id}", status_code = 200,tags = ["Events"])
+async def ending_point_your_suspicion (game_id : int, db : Session = Depends(get_db)) :
+    pys = end_point_your_suspicion(game_id, db)
+    await broadcast_game_information(game_id)
+
+    return pys
+>>>>>>> dev
 
 # --- ¡RUTA MODIFICADA! ---
 @events.post(
