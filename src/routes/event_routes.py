@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 from src.database.database import SessionLocal, get_db
-<<<<<<< HEAD
 from src.database.models import (
     Card,
     Game,
@@ -12,15 +11,17 @@ from src.database.models import (
     Set,
     Player,
     ActiveTrade,
+    Log
 )
-from src.database.services.services_cards import only_6, replenish_draft_pile
+from src.database.services.services_cards import only_6, replenish_draft_pile, register_cancelable_event, count
 from src.database.services.services_games import finish_game
-from src.schemas.card_schemas import Card_Response, Discard_List_Request
+from src.schemas.card_schemas import Card_Response, Discard_List_Request, Event_Response
 from src.database.services.services_websockets import (
     broadcast_last_discarted_cards,
     broadcast_game_information,
     broadcast_player_state,
     broadcast_card_draft,
+    broadcast_last_cancelable_event
 )
 from src.database.services.services_events import (
     cards_off_table,
@@ -33,14 +34,6 @@ from src.database.services.services_events import (
     initiate_dead_card_folly,
     select_card_for_folly_trade_service,
 )
-=======
-from src.database.models import Card , Game , Detective , Event, Secrets, Set, Player, ActiveTrade , Log
-from src.database.services.services_cards import only_6 , replenish_draft_pile , register_cancelable_event, count
-from src.database.services.services_games import finish_game
-from src.schemas.card_schemas import Card_Response, Discard_List_Request, Event_Response
-from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_game_information , broadcast_player_state, broadcast_card_draft , broadcast_last_cancelable_event
-from src.database.services.services_events import cards_off_table, look_into_ashes, one_more, early_train_paddington, delay_the_murderers_escape, point_your_suspicion, end_point_your_suspicion, initiate_card_trade, select_card_for_trade_service
->>>>>>> feature_SCRUM-121-Crear-tabla-para-log-endpoints
 import random
 
 events = APIRouter()
