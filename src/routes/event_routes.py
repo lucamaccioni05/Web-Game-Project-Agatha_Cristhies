@@ -288,14 +288,6 @@ async def activate_dead_card_folly_trade_select_card(
         
     return result
 
-@events.post("/event/Not_so_fast/{card_id}", status_code=200, tags=["Events"])
-async def activate_cancelable_event(card_id: int, db: Session = Depends(get_db)):
-
-    valid = register_cancelable_event(card_id , db)
-    if valid:
-        await broadcast_last_cancelable_event(card_id)
-    else: 
-        raise HTTPException(status_code=404, detail="You can not play anymore")
     
 @events.get("/events/count/Not_so_fast/{game_id}" , status_code=200, tags=["Events"])
 def count_NSF(game_id: int , db:Session = Depends(get_db)):
