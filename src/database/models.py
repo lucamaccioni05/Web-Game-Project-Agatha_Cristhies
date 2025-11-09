@@ -132,6 +132,6 @@ class Log(Base):
     game_id = Column(Integer , ForeignKey("games.game_id"),nullable=False)
     game = relationship("Game" , back_populates="log")
     
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(), server_default=func.now())
     type = Column(String(30))
     

@@ -5,7 +5,7 @@ from src.database.database import SessionLocal, get_db
 from src.database.models import Card , Game , Detective , Event, Secrets, Set, Player, ActiveTrade , Log
 from src.database.services.services_cards import only_6 , replenish_draft_pile , register_cancelable_event, count
 from src.database.services.services_games import finish_game
-from src.schemas.card_schemas import Card_Response, Discard_List_Request
+from src.schemas.card_schemas import Card_Response, Discard_List_Request, Event_Response
 from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_game_information , broadcast_player_state, broadcast_card_draft , broadcast_last_cancelable_event
 from src.database.services.services_events import cards_off_table, look_into_ashes, one_more, early_train_paddington, delay_the_murderers_escape, initiate_card_trade, select_card_for_trade_service
 import random
@@ -145,15 +145,11 @@ async def activate_cancelable_event(card_id: int, db: Session = Depends(get_db))
     else: 
         raise HTTPException(status_code=404, detail="You can not play anymore")
     
-@events.get("/events/count/Not_so_fast/{card_id}" , status_code=200 , response_model=Card_Response, tags=["Events"])
-def count_NSF(card_id: int , db:Session = Depends(get_db)):
-    card = db.query(Card).filter(Card.card_id == card_id).first()
-    last_card = db.query(Log).filter(Log.game_id == card.game_id).order_by(Log.created_at.desc()).first()
-    NSF_amount = count(card_id , db)
+@events.get("/events/count/Not_so_fast/{game_id}" , status_code=200 , response_model=Event_Response, tags=["Events"])
+def count_NSF(game_id: int , db:Session = Depends(get_db)):
+    NSF_amount = count(game_id , db)
+    return NSF_amount
 
-    if NSF_amount % 2 != 0:
-        return card
-    else:
-        return last_card
+    
 
     
