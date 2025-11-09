@@ -199,7 +199,7 @@ async def activate_card_trade_initiate(
     trader = db.query(Player).filter(Player.player_id == trader_id).first()
     if trader:
         await broadcast_game_information(trader.game_id)
-
+        await broadcast_last_discarted_cards(trader.player_id)
     return result
 
 
@@ -251,6 +251,7 @@ async def activate_dead_card_folly_initiate(
     )
 
     await broadcast_game_information(game_id)
+    await broadcast_last_discarted_cards(player_id)
     return result
 
 

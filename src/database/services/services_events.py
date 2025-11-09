@@ -260,6 +260,11 @@ def initiate_card_trade(trader_id: int, tradee_id: int, card_id: int, db: Sessio
         tradee.pending_action = "SELECT_TRADE_CARD"
 
         # 3. Descartar la carta de evento (¡NUEVO!)
+        max_discard = db.query(func.max(Card.discardInt)).filter(Card.game_id == card_to_discard.game_id).scalar()
+        
+        # Asigna el siguiente valor en la secuencia
+        card_to_discard.discardInt = (max_discard or 0) + 1
+        card_to_discard.picked_up = False
         card_to_discard.dropped = True
         card_to_discard.player_id = None
         # (Añade aquí tu lógica de 'discardInt' si es necesaria)
@@ -403,6 +408,11 @@ def initiate_dead_card_folly(
             player.pending_action = "SELECT_FOLLY_CARD"
 
         # Descartamos la carta de evento
+        max_discard = db.query(func.max(Card.discardInt)).filter(Card.game_id == card_to_discard.game_id).scalar()
+        
+        # Asigna el siguiente valor en la secuencia
+        card_to_discard.discardInt = (max_discard or 0) + 1
+        card_to_discard.picked_up = False
         card_to_discard.dropped = True
         card_to_discard.player_id = None
 
