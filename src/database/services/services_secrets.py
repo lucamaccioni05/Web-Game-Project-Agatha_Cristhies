@@ -114,8 +114,6 @@ async def check_social_disgrace_win_condition(game_id: int, db: Session):
     """
     #  Obtener todos los jugadores de la partida
     players = db.query(Player).filter(Player.game_id == game_id, Player.social_disgrace == True).all()
-    if not players:
-        raise HTTPException(status_code=404, detail="No players found")
 
     if len(players) == db.query(Player).filter(Player.game_id == game_id).count() - 1:
         # Todos los jugadores excepto uno (asesino) están en desgracia social
@@ -148,8 +146,6 @@ async def reveal_secret(secret_id: int, db: Session):
         update_social_disgrace(player)
 
 
-    await check_social_disgrace_win_condition(secret.game_id, db)
-
     game = db.query(Game).filter(Game.game_id == secret.game_id).first()
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
@@ -158,6 +154,8 @@ async def reveal_secret(secret_id: int, db: Session):
     )
     if player_in_turn and player_in_turn.pending_action == "WAITING_REVEAL_SECRET":
         player_in_turn.pending_action = "Clense"
+    
+    await check_social_disgrace_win_condition(secret.game_id, db)
 
     try:
         db.commit()
