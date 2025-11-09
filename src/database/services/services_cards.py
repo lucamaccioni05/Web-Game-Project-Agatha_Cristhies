@@ -3,7 +3,7 @@ from fastapi import Depends
 from src.database.database import SessionLocal, get_db
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from src.database.models import Player, Card , Detective , Event, Game , Log
+from src.database.models import Player, Card , Detective , Event, Game , Log, Set
 from datetime import datetime , timezone , timedelta, tzinfo
 
 def setup_initial_draft_pile(game_id: int, db: Session):
@@ -246,34 +246,56 @@ def register_cancelable_event (card_id, db: Session= Depends(get_db)):
     
     return False
 
+def register_cancelable_set (set_id, db: Session= Depends(get_db)):
+    new_set = db.query(Set).filter(Set.set_id == set_id).first()
+
+    if not new_set:
+        raise HTTPException(status_code=404, detail="Set not found")
+    
+    new_log = Log(set_id = new_set.set_id, 
+                game_id = new_set.game_id,
+                type = "Set")
+    
+    try:
+        db.add(new_log)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error creating cancelable event: {str(e)}")
+    return True
+
+
 def count (game_id: int, db:Session= Depends(get_db)):
-    logs_con_cartas = db.query(Log, Event) \
-        .join(Event, Log.card_id == Event.card_id) \
+    logs_con_todo = db.query(Log, Event, Set) \
+        .outerjoin(Event, Log.card_id == Event.card_id) \
+        .outerjoin(Set, Log.set_id == Set.set_id ) \
         .filter(Log.game_id == game_id) \
         .order_by(Log.created_at.desc()) \
         .all()
 
-    if not logs_con_cartas:
+    if not logs_con_todo:
         raise HTTPException(status_code=404, detail="There are no events to count")
 
-    newest_log, newest_card = logs_con_cartas[0]
+    newest_log, newest_event, newest_set = logs_con_todo[0]
+    newest_item = newest_event if newest_event else newest_set
 
     if newest_log.type != "event":
-        return newest_card
+        return newest_item
 
     nsf_count = 0
-    target_card = None 
-    for log, card in logs_con_cartas:
-        if card.name == "Not so fast":
+    target_item = None 
+
+    for log, event, set_item in logs_con_todo:
+        if event and event.name == "Not so fast":
             nsf_count += 1
         else:
-            target_card = card
+            target_item = event if event else set_item
             break 
     
-    if target_card is None:
-        return newest_card
+    if target_item is None:
+        return newest_item
 
     if nsf_count % 2 == 0:
-        return target_card
+        return target_item
     else:
-        return newest_card
+        return newest_item

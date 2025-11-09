@@ -6,7 +6,8 @@ from src.database.database import SessionLocal, get_db
 from src.database.models import Card , Game , Detective , Event , Set, Player
 from src.database.services.services_cards import only_6
 from src.schemas.card_schemas import Card_Response , Detective_Response , Event_Response
-from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_player_state
+from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_player_state, broadcast_last_cancelable_set
+from src.database.services.services_cards import register_cancelable_set
 import random
 
 set = APIRouter()
@@ -247,7 +248,15 @@ async def add_detective(card_id : int, set_id : int, db : Session = Depends(get_
         except Exception as e:
             db.rollback()
             raise HTTPException(status_code=400, detail=f"Error adding set: {str(e)}")
-        
+
+@set.post("/set/Not_so_fast/{card_id}", status_code=200, tags=["Sets"])
+async def activate_cancelable_set(set_id: int, db: Session = Depends(get_db)):
+
+    valid = register_cancelable_set(set_id , db)
+    if valid:
+        await broadcast_last_cancelable_set(set_id)
+    else: 
+        raise HTTPException(status_code=404, detail="Error")
     
 
         

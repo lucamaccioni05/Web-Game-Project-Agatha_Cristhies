@@ -297,7 +297,7 @@ async def activate_cancelable_event(card_id: int, db: Session = Depends(get_db))
     else: 
         raise HTTPException(status_code=404, detail="You can not play anymore")
     
-@events.get("/events/count/Not_so_fast/{game_id}" , status_code=200 , response_model=Event_Response, tags=["Events"])
+@events.get("/events/count/Not_so_fast/{game_id}" , status_code=200, tags=["Events"])
 def count_NSF(game_id: int , db:Session = Depends(get_db)):
     NSF_amount = count(game_id , db)
     return NSF_amount

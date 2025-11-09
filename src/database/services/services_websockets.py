@@ -4,8 +4,9 @@ from sqlalchemy import desc, select, true, orm
 from sqlalchemy.orm import Session
 from src.schemas.card_schemas import Card_Response, AllCardsResponse
 from src.database.database import SessionLocal
-from src.database.models import Detective, Game, Player, Card, Event
+from src.database.models import Detective, Game, Player, Card, Event, Set
 from src.schemas.games_schemas import Game_Response
+from src.schemas.set_schemas import Set_Response
 from src.webSocket.connection_manager import lobbyManager, gameManager
 from src.schemas.players_schemas import Player_Base, Player_State
 import json
@@ -215,6 +216,30 @@ async def broadcast_last_cancelable_event(card_id : int):
         await gameManager.broadcast(json.dumps({
             "type": "cardResponse",
             "data": card_json
+        }), game_id)
+
+    finally:
+        db.close()   
+
+async def broadcast_last_cancelable_set(set_id : int):
+    db = SessionLocal()
+    try:
+        stmt = select(Set).where(Set.set_id == set_id)
+        set = db.execute(stmt).scalar_one_or_none()
+
+        if not set:
+            raise HTTPException(status_code=404, detail="Set not found")
+
+        game_id = set.game_id
+
+        set_adapter = TypeAdapter(Set_Response)
+        set_response = set_adapter.validate_python(set, from_attributes=True)
+
+        set_json = jsonable_encoder(set_response)
+
+        await gameManager.broadcast(json.dumps({
+            "type": "setResponse",
+            "data": set_json
         }), game_id)
 
     finally:
