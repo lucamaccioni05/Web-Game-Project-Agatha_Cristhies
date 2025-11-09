@@ -3,7 +3,8 @@ from fastapi import Depends
 from src.database.database import SessionLocal, get_db
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from src.database.models import Player, Card , Detective , Event, Game
+from src.database.models import Player, Card , Detective , Event, Game , Log
+from datetime import datetime , timezone , timedelta, tzinfo
 
 def setup_initial_draft_pile(game_id: int, db: Session):
     """
@@ -184,3 +185,95 @@ def only_6 (player_id , db: Session = Depends(get_db)):
         return True
     else:
         return False
+    
+def register_cancelable_event (card_id, db: Session= Depends(get_db)):
+    new_event = db.query(Event).filter(Event.card_id == card_id).first()
+    if not new_event:
+        raise HTTPException(status_code=404, detail="Card not found")
+    
+    last_cancelable_event = db.query(Log).filter(Log.game_id == new_event.game_id).order_by(Log.created_at.desc()).first()
+    if not last_cancelable_event:
+        event = Log(
+                card_id = new_event.card_id, 
+                game_id = new_event.game_id,
+                type = new_event.type)
+        try:
+            db.add(event)
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=f"Error creating cancelable event: {str(e)}")
+        return True
+    
+    if new_event.name != "Not so fast":
+        event = Log(
+                card_id = new_event.card_id, 
+                game_id = new_event.game_id,
+                type = new_event.type)
+        try:
+            db.add(event)
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=f"Error creating cancelable event: {str(e)}")
+        return True
+    
+    time = datetime.now()
+    time_db = last_cancelable_event.created_at
+
+    if isinstance(time_db, str):
+        try:
+            time_db = datetime.fromisoformat(time_db)
+        except Exception:
+            raise HTTPException(status_code=500, detail="Invalid timestamp in DB")
+
+    if time_db is None:
+        raise HTTPException(status_code=500, detail="Missing timestamp in DB")
+
+    result = time- time_db
+    if result < timedelta(seconds=10):
+        event = Log(
+                card_id = new_event.card_id, 
+                game_id = new_event.game_id,
+                type = new_event.type)
+        try:
+            db.add(event)
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=f"Error creating cancelable event: {str(e)}")
+        return True
+    
+    return False
+
+def count (game_id: int, db:Session= Depends(get_db)):
+    logs_con_cartas = db.query(Log, Event) \
+        .join(Event, Log.card_id == Event.card_id) \
+        .filter(Log.game_id == game_id) \
+        .order_by(Log.created_at.desc()) \
+        .all()
+
+    if not logs_con_cartas:
+        raise HTTPException(status_code=404, detail="There are no events to count")
+
+    newest_log, newest_card = logs_con_cartas[0]
+
+    if newest_log.type != "event":
+        return newest_card
+
+    nsf_count = 0
+    target_card = None 
+    for log, card in logs_con_cartas:
+        if card.name == "Not so fast":
+            nsf_count += 1
+        else:
+            target_card = card
+            break 
+    
+    if target_card is None:
+        return newest_card
+
+    if nsf_count % 2 == 0:
+        return target_card
+    else:
+        return newest_card
