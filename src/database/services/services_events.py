@@ -347,7 +347,13 @@ def select_card_for_trade_service(player_id: int, card_id: int, db: Session):
     return {"message": "Card selected."}
 
 
-def initiate_dead_card_folly(player_id: int, game_id: int, card_id: int, db: Session):
+def initiate_dead_card_folly(
+    player_id: int, game_id: int, card_id: int, direction: str, db: Session
+):
+    """
+    Inicia el evento Dead Card Folly.
+    Define la dirección (left/right), setea pending_action y descarta la carta del evento.
+    """
 
     # Obtener jugadores y el jugador que usó la carta
     players = db.query(Player).filter(Player.game_id == game_id).all()
@@ -369,30 +375,49 @@ def initiate_dead_card_folly(player_id: int, game_id: int, card_id: int, db: Ses
     )
 
     if not card_to_discard:
+        print(">> Jugadores en partida:", [p.player_id for p in players])
+        print(">> Player_id recibido:", player_id)
+        print(">> Game_id recibido:", game_id)
+        print(">> Card_id recibido:", card_id)
+        print(">> Direction recibido:", direction)
+
         raise HTTPException(
-            status_code=404, detail="Carta de evento 'Dead Card Folly' no encontrada."
+            status_code=404,
+            detail="Carta de evento 'Dead Card Folly' no encontrada.",
         )
 
+    game = db.query(Game).filter(Game.game_id == game_id).first()
+    if not game:
+        raise HTTPException(status_code=404, detail="Partida no encontrada.")
+
     try:
-        # Seteamoss el pending action para cada jugador
+
+        if direction not in ["left", "right"]:
+            raise HTTPException(
+                status_code=400, detail="Dirección inválida. Debe ser 'left' o 'right'."
+            )
+        game.direction_folly = direction
+
+        # Seteamos el pending_action para cada jugador
         for player in players:
-            if player.player_id == player_id:
-                player.pending_action = "SELECT_FOLLY_CARD"
-            else:
-                player.pending_action = "SELECT_FOLLY_CARD"
+            player.pending_action = "SELECT_FOLLY_CARD"
 
         # Descartamos la carta de evento
         card_to_discard.dropped = True
         card_to_discard.player_id = None
 
         db.commit()
+
+        return {
+            "message": f"Dead Card Folly iniciado correctamente. Dirección: {direction}."
+        }
+
     except Exception as e:
         db.rollback()
         raise HTTPException(
-            status_code=400, detail=f"Error iniciando Dead Card Folly: {str(e)}"
+            status_code=400,
+            detail=f"Error iniciando Dead Card Folly: {str(e)}",
         )
-
-    return {"message": "Dead Card Folly iniciado correctamente."}
 
 
 def select_card_for_folly_trade_service(
@@ -400,7 +425,8 @@ def select_card_for_folly_trade_service(
 ):
     """
     Servicio: Un jugador selecciona una carta para el evento 'Dead Card Folly'.
-    Intercambia directamente la carta seleccionada entre from_player_id y to_player_id.
+    Cuando todos los jugadores completan su selección, se limpian los pending_action
+    y el evento concluye.
     """
     from_player = db.query(Player).filter(Player.player_id == from_player_id).first()
     to_player = db.query(Player).filter(Player.player_id == to_player_id).first()
@@ -436,11 +462,38 @@ def select_card_for_folly_trade_service(
         # Transferir la carta directamente al jugador destino
         card.player_id = to_player_id
 
-        # Actualizar los estados de acción
-        from_player.pending_action = None
-        to_player.pending_action = None
+        # Marcar al jugador como que ya realizó su acción
+        from_player.pending_action = "WAITING_FOR_FOLLY_TRADE"
+        db.add(from_player)
 
         db.commit()
+        db.refresh(card)
+        db.refresh(to_player)
+
+        players_in_game = (
+            db.query(Player).filter(Player.game_id == from_player.game_id).all()
+        )
+        for p in players_in_game:
+            db.refresh(p)
+
+        all_selected = all(
+            p.pending_action == "WAITING_FOR_FOLLY_TRADE" for p in players_in_game
+        )
+
+        if all_selected:
+            # ✅ Todos eligieron → limpiar pending_action y finalizar evento
+            for p in players_in_game:
+                p.pending_action = None
+
+            db.commit()
+
+            return {
+                "message": "Todos los jugadores completaron Dead Card Folly. Avanzando al siguiente paso."
+            }
+
+        return {
+            "message": f"El jugador {from_player.name} pasó la carta '{card.name}' a {to_player.name}."
+        }
 
     except Exception as e:
         db.rollback()
@@ -448,7 +501,3 @@ def select_card_for_folly_trade_service(
             status_code=400,
             detail=f"Error al seleccionar carta para Dead Card Folly: {str(e)}",
         )
-
-    return {
-        "message": f"El jugador {from_player.name} pasó la carta '{card.name}' a {to_player.name}."
-    }

@@ -228,7 +228,7 @@ async def activate_card_trade_select_card(
 
 #############################################################
 @events.post(
-    "/event/dead_card_folly/initiate/{player_id}/{game_id}/{card_id}",
+    "/event/dead_card_folly/initiate/{player_id}/{game_id}/{card_id}/{direction}",
     status_code=200,
     tags=["Events"],
 )
@@ -236,6 +236,7 @@ async def activate_dead_card_folly_initiate(
     player_id: int,  # Jugador que activa el evento
     game_id: int,
     card_id: int,
+    direction: str,
     db: Session = Depends(get_db),
 ):
     """
@@ -245,6 +246,7 @@ async def activate_dead_card_folly_initiate(
         player_id=player_id,
         game_id=game_id,
         card_id=card_id,
+        direction=direction,
         db=db,
     )
 
@@ -268,9 +270,9 @@ async def activate_dead_card_folly_trade_select_card(
     """
     # Lógica de intercambio (usa el mismo servicio que el trade común, si corresponde)
     result = select_card_for_folly_trade_service(
-        player_id=from_player_id,
-        card_id=card_id,
+        from_player_id=from_player_id,
         to_player_id=to_player_id,
+        card_id=card_id,
         db=db,
     )
 
@@ -278,28 +280,5 @@ async def activate_dead_card_folly_trade_select_card(
     from_player = db.query(Player).filter(Player.player_id == from_player_id).first()
     if from_player:
         await broadcast_game_information(from_player.game_id)
-
-    return result
-
-
-@events.post(
-    "/event/dead_card_folly/select_card/{player_id}/{card_id}",
-    status_code=200,
-    tags=["Events"],
-)
-async def activate_dead_card_folly_trade_select_card(
-    player_id: int, card_id: int, db: Session = Depends(get_db)
-):
-    """
-    Ruta: Un jugador selecciona una carta para el trade.
-    El servicio maneja la lógica de esperar o ejecutar.
-    """
-    # El servicio maneja toda la lógica
-    result = select_card_for_trade_service(player_id=player_id, card_id=card_id, db=db)
-
-    # El broadcast se queda aquí
-    player = db.query(Player).filter(Player.player_id == player_id).first()
-    if player:
-        await broadcast_game_information(player.game_id)
 
     return result
