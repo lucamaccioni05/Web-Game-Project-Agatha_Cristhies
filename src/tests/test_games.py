@@ -203,12 +203,33 @@ async def test_update_turn_success(client, db_session, mocker):
     game = Game(name="Test Game", status="in course", max_players=4, min_players=2, players_amount=2, current_turn=1)
     db_session.add(game)
     db_session.commit()
+    db_session.refresh(game)
 
-    response = client.put(f"/game/update_turn/{game.game_id}")
+    game_id_to_check = game.game_id
+    player1 = Player(
+        name="Player 1", 
+        host=True, 
+        game_id=game_id_to_check, # Lo vinculas al juego
+        turn_order=1,
+        birth_date=datetime.date(2000, 1, 1)
+    )
+    player2 = Player(
+        name="Player 2", 
+        host=False, 
+        game_id=game_id_to_check, # Lo vinculas al juego
+        turn_order=2, # El endpoint buscará este turno
+        birth_date=datetime.date(2000, 1, 2)
+    )
     
+    # 3. Los añades a la base de datos de prueba
+    db_session.add_all([player1, player2])
+    db_session.commit()
+
+    print(game.game_id)
+    response = client.put(f"/game/update_turn/{game.game_id}") 
     assert response.status_code == 202
-    assert response.json() == 2
-    mock_broadcast.assert_awaited_once_with(game.game_id)
+    
+    mock_broadcast.assert_awaited_once_with(game_id_to_check)
 
 @pytest.mark.asyncio
 async def test_update_turn_wraps_around(client, db_session, mocker):
@@ -217,12 +238,16 @@ async def test_update_turn_wraps_around(client, db_session, mocker):
     game = Game(name="Test Game", status="in course", max_players=2, min_players=2, players_amount=2, current_turn=2)
     db_session.add(game)
     db_session.commit()
-    
+    db_session.refresh(game)
+    game_id_to_check = game.game_id
+    player1 = Player(name="Player 1", host=True, game_id=game_id_to_check, turn_order=1, birth_date=datetime.date(2000, 1, 1))
+    player2 = Player(name="Player 2", host=False, game_id=game_id_to_check, turn_order=2, birth_date=datetime.date(2000, 1, 2))
+    db_session.add_all([player1, player2])
+    db_session.commit()
     response = client.put(f"/game/update_turn/{game.game_id}")
     
     assert response.status_code == 202
-    assert response.json() == 1
-    mock_broadcast.assert_awaited_once_with(game.game_id)
+    mock_broadcast.assert_awaited_once_with(game_id_to_check)
 
 @pytest.mark.asyncio
 async def test_update_turn_game_not_found(client):

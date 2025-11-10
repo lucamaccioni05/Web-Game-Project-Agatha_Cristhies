@@ -111,15 +111,13 @@ async def update_turn (game_id : int , db: Session = Depends(get_db)) :
 
     log_turn_change = Log(
         game_id=game_id,
-        player_id=next_player.player_id, # El ID del jugador que *empieza*
+        player_id=next_player.player_id, 
         type="TurnChange"
     )
     db.add(log_turn_change)
     
     try:
         db.commit()
-        # Tu broadcast_game_information (asumo) envía el estado actualizado
-        # del juego, que ahora incluye el nuevo log. ¡Esto es perfecto!
         await broadcast_game_information(game_id) 
     except Exception as e:
         db.rollback()
