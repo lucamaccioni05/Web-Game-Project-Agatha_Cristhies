@@ -238,8 +238,6 @@ def initiate_card_trade(trader_id: int, tradee_id: int, card_id: int, db: Sessio
     return {"message": "Trade initiated and card discarded."}
 
 
-# REEMPLAZA TU FUNCIÓN ENTERA POR ESTA:
-
 def select_card_for_trade_service(player_id: int, db: Session, card_id: int):
     """
     Servicio: Un jugador selecciona una carta para el trade.
@@ -272,7 +270,7 @@ def select_card_for_trade_service(player_id: int, db: Session, card_id: int):
         
         player.pending_action = "WAITING_FOR_TRADE_PARTNER"
 
-        # Si el trade está listo (ambos eligieron)
+        
         if trade.player_one_card_id and trade.player_two_card_id:
             _execute_trade(
                 trader_id=trade.player_one_id,
@@ -285,8 +283,8 @@ def select_card_for_trade_service(player_id: int, db: Session, card_id: int):
             player_one = db.query(Player).filter(Player.player_id == trade.player_one_id).first()
             player_two = db.query(Player).filter(Player.player_id == trade.player_two_id).first()
         
-            card_1_id = trade.player_one_card_id # Carta del Jugador 1
-            card_2_id = trade.player_two_card_id # Carta del Jugador 2
+            card_1_id = trade.player_one_card_id
+            card_2_id = trade.player_two_card_id
 
             polymorphic_loader = orm.with_polymorphic(Card, [Detective, Event])
             stmt = select(polymorphic_loader).where(Card.card_id.in_([card_1_id, card_2_id]))
@@ -314,13 +312,16 @@ def select_card_for_trade_service(player_id: int, db: Session, card_id: int):
                     social_faux_paus_detected = True
                     if card.card_id == card_1_id : 
                         receiver_player = player_two
+                        sender_player = player_one
                     else : 
                         receiver_player = player_one
-                    receiver_player.pending_action = "SocialFauxPas_REVEAL"
+                        sender_player = player_two  
+                    receiver_player.pending_action = "REVEAL_SECRET"
+                    sender_player.pending_action = None
                     break
 
             # Si no fue blackmail o social faux pas, limpiamos pending actions
-            if not blackmail_detected or not social_faux_paus_detected:
+            if not blackmail_detected and not social_faux_paus_detected:
                 if player_one: player_one.pending_action = None
                 if player_two: player_two.pending_action = None
 
