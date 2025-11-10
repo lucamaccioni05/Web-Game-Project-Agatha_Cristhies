@@ -238,8 +238,9 @@ def initiate_card_trade(trader_id: int, tradee_id: int, card_id: int, db: Sessio
     return {"message": "Trade initiated and card discarded."}
 
 
-# --- (Tu función select_card_for_trade_service ya está bien como la tenías) ---
-def select_card_for_trade_service(player_id: int, card_id: int, db: Session):
+# REEMPLAZA TU FUNCIÓN ENTERA POR ESTA:
+
+def select_card_for_trade_service(player_id: int, db: Session, card_id: int):
     """
     Servicio: Un jugador selecciona una carta para el trade.
     Si ambos jugadores han seleccionado, ejecuta el trade llamando a _execute_trade.
@@ -271,6 +272,7 @@ def select_card_for_trade_service(player_id: int, card_id: int, db: Session):
         
         player.pending_action = "WAITING_FOR_TRADE_PARTNER"
 
+        # Si el trade está listo (ambos eligieron)
         if trade.player_one_card_id and trade.player_two_card_id:
             _execute_trade(
                 trader_id=trade.player_one_id,
@@ -282,59 +284,53 @@ def select_card_for_trade_service(player_id: int, card_id: int, db: Session):
             
             player_one = db.query(Player).filter(Player.player_id == trade.player_one_id).first()
             player_two = db.query(Player).filter(Player.player_id == trade.player_two_id).first()
-            
-            if player_one: player_one.pending_action = None
-            if player_two: player_two.pending_action = None
-            
-            
-            
-           # Esta parte devuelve el player con el que se tradeo y la carta tradeada en caso de que se haya tradeado el blackmail
+        
             card_1_id = trade.player_one_card_id # Carta del Jugador 1
             card_2_id = trade.player_two_card_id # Carta del Jugador 2
 
             polymorphic_loader = orm.with_polymorphic(Card, [Detective, Event])
-            stmt = (
-                select(polymorphic_loader)
-                .where(Card.card_id.in_([card_1_id, card_2_id]))
-            )
-
-
+            stmt = select(polymorphic_loader).where(Card.card_id.in_([card_1_id, card_2_id]))
             cards_involved = db.execute(stmt).scalars().all()
-            card_adapter = TypeAdapter(AllCardsResponse)
-            for card in cards_involved : 
-                if card.type == "event" and card.name == "Blackmailed" : 
-                    if card.card_id == card_1_id : 
-                        sender_player_id = trade.player_one_id
-                        receiving_player_id = trade.player_two_id
-                    else : 
-                        sender_player_id = trade.player_two_id
-                        receiving_player_id = trade.player_one_id
-                    card_response_data = card_adapter.validate_python(
-                        card, from_attributes=True
-                    )
-                    
-                    blackmail_card_dict = jsonable_encoder(card_response_data)
+            
+            # --- INICIO DEL BLOQUE RE-INDENTADO ---
+            # (Todo este bloque ahora está DENTRO del if 'trade listo')
+            
+            blackmail_detected = False
+            for card in cards_involved:
+                if card.type == "event" and card.name == "Blackmailed":
+                    blackmail_detected = True
+                    # Determinar quién es quién
+                    if card.card_id == card_1_id: 
+                        # P1 (Chantajista) dio Blackmailed a P2
+                        sender_player = player_one
+                        receiver_player = player_two
+                    else:
+                        # P2 (Chantajista) dio Blackmailed a P1
+                        sender_player = player_two
+                        receiver_player = player_one
 
-                    db.delete(trade)
-                    db.commit() 
-                    return {
-                        "sender_player_id": sender_player_id,
-                        "receiver_player_id": receiving_player_id,
-                        "blackmail_card": blackmail_card_dict
-                    }
+                    # Ponemos al chantajista (sender) a esperar
+                    sender_player.pending_action = "WAITING_FOR_BLACKMAIL" 
+                    # Ponemos al chantajeado (receiver) a elegir un secreto
+                    receiver_player.pending_action = "CHOOSE_BLACKMAIL_SECRET"
+                    break # Salimos del bucle
+
+            # Si no fue blackmail, limpiamos pending actions
+            if not blackmail_detected:
+                if player_one: player_one.pending_action = None
+                if player_two: player_two.pending_action = None
+
             db.delete(trade)
             db.commit() 
-            return {"message" : "Trade completed"}
+            return {"message": "Trade completed"}
+            # --- FIN DEL BLOQUE RE-INDENTADO ---
            
-            
         else:
             # El trade NO está completo
             db.commit()
             return {"status": "waiting"}
             
-        db.commit()
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error al seleccionar carta para trade: {str(e)}")
-
-    return {"message": "Card selected."}
+    

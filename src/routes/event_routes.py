@@ -142,20 +142,22 @@ async def activate_card_trade_select_card(player_id: int, card_id: int, db: Sess
     Ruta: Un jugador selecciona una carta para el trade.
     El servicio maneja la lógica de esperar o ejecutar.
     """
-    # El servicio maneja toda la lógica
-    result = select_card_for_trade_service(player_id=player_id, card_id=card_id, db=db)
+    # El servicio (sincrónico) hace toda la lógica de DB
+    result = select_card_for_trade_service(player_id=player_id, db=db, card_id=card_id) # Ojo al orden
     
-    # El broadcast se queda aquí
+    # El broadcast se queda aquí (¡Y es ASYNC!)
     player = db.query(Player).filter(Player.player_id == player_id).first()
     if player:
+        # ¡ESTA ES LA LÍNEA MÁS IMPORTANTE!
+        # Anuncia los cambios (nuevos pending_action, etc.) a todos
         await broadcast_game_information(player.game_id)
         
     return result
 
-@events.post("/event/blackmailed/{player_id_from}, {player_id_to}, {secret_id}", status_code= 200, response_model= Secret_Response,  tags = ["Events"])
-async def activate_blackmailed(player_id_showing : int, player_id_to_show : int, secret_id : int, db : Session = Depends (get_db)) :
-    player_showing =  db.query(Player).filter(Player.player_id == player_id_showing).first()
-    player_showed = db.query(Player).filter(Player.player_id == player_id_to_show).first()
+@events.post("/event/blackmailed/{player_id_from},{player_id_to},{secret_id}", status_code= 200, response_model= Secret_Response,  tags = ["Events"])
+async def activate_blackmailed(player_id_from : int, player_id_to : int, secret_id : int, db : Session = Depends (get_db)) :
+    player_showing =  db.query(Player).filter(Player.player_id == player_id_from).first()
+    player_showed = db.query(Player).filter(Player.player_id == player_id_to).first()
     if not player_showed or player_showing : 
         raise HTTPException(status_code=404, detail="Players not found.")
     game_id = player_showed.game_id
@@ -170,15 +172,15 @@ async def activate_blackmailed(player_id_showing : int, player_id_to_show : int,
             status_code=400,
             detail=f"Error executing 'Blackmail' event: {str(e)}",
         )
-    await broadcast_blackmailed(game_id)
+    await broadcast_blackmailed(game_id, secret)
 
     return secret 
 
 
-@events.post("/event/blackmailed/deactivate/{player_id_from}, {player_id_to}", status_code= 200, response_model= Secret_Response,  tags = ["Events"])
-async def deactivate_blackmailed(player_id_showing : int, player_id_to_show : int, db : Session = Depends (get_db)) :
-    player_showing =  db.query(Player).filter(Player.player_id == player_id_showing).first()
-    player_showed = db.query(Player).filter(Player.player_id == player_id_to_show).first()
+@events.post("/event/blackmailed/deactivate/{player_id_from}/,{player_id_to}", status_code= 200, response_model= Secret_Response,  tags = ["Events"])
+async def deactivate_blackmailed(player_id_from : int, player_id_to : int, db : Session = Depends (get_db)) :
+    player_showing =  db.query(Player).filter(Player.player_id == player_id_from).first()
+    player_showed = db.query(Player).filter(Player.player_id == player_id_to).first()
     if not player_showed or player_showing : 
         raise HTTPException(status_code=404, detail="Players not found.")
     game_id = player_showed.game_id
@@ -195,7 +197,3 @@ async def deactivate_blackmailed(player_id_showing : int, player_id_to_show : in
     await broadcast_game_information(game_id)
 
     return None 
-
-
-
-

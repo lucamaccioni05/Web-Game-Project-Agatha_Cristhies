@@ -13,6 +13,12 @@ import json
 from sqlalchemy.orm import joinedload
 from pydantic import TypeAdapter
 from typing import Dict, Any
+from src.database.models import Secrets
+from src.schemas.secret_schemas import Secret_Response
+from fastapi.encoders import jsonable_encoder
+from sqlalchemy.orm import Session 
+from src.database.database import get_db 
+from fastapi import Depends, HTTPException 
 
 
 async def broadcast_available_games(db: Session):
@@ -196,15 +202,13 @@ async def broadcast_card_draft(game_id: int):
     finally:
         db.close()
 
-async def broadcast_blackmailed(game_id: int, secret_id : int):
+async def broadcast_blackmailed(game_id: int, secret : Secrets): # Acepta el objeto Secret
     db = SessionLocal()
     try:
         game = db.query(Game).filter(Game.game_id == game_id).first()
         if not game:
-            # Si el juego ya no existe, no hacemos nada.
             print(f"Intento de broadcast para un juego no existente: {game_id}")
             return
-        secret = db.query(Secrets).filter(Secrets.secret_id == secret_id).first()
 
         players = (
             db.query(Player)
@@ -219,13 +223,15 @@ async def broadcast_blackmailed(game_id: int, secret_id : int):
         ]
         playersStateResponseJson = jsonable_encoder(playersStateResponse)
 
+        # Broadcast del secreto (con el 'type' correcto para el frontend)
         await gameManager.broadcast(
-            json.dumps({"type": "Blackmailed(Secret)", "data": secretResponse}), game_id
+            json.dumps({"type": "blackmailed", "data": secretResponse}), game_id
         )
 
+        # Broadcast del estado de jugadores (aún necesario)
         await gameManager.broadcast(
             json.dumps({"type": "playersState", "data": playersStateResponseJson}),
             game_id,
         )
     finally:
-        db.close()  # cierro la conecxion para evitar saturacion de conexiones en la bdd
+        db.close()
