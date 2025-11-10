@@ -248,8 +248,9 @@ async def add_detective(card_id : int, set_id : int, db : Session = Depends(get_
         except Exception as e:
             db.rollback()
             raise HTTPException(status_code=400, detail=f"Error adding set: {str(e)}")
-
-
+    else:
+        raise HTTPException(status_code=400, detail="Card is not compatible with this set")
+        
     
 
         
