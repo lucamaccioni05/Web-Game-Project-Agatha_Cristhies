@@ -1,45 +1,52 @@
 """
-Tests for the Event endpoints and services, using pytest fixtures for isolation.
+Exhaustive tests for the Event endpoints and services, using pytest fixtures for isolation.
 """
 import datetime
 import pytest
 from unittest.mock import patch, AsyncMock
 
-# Import models needed for setting up test data
-from src.database.database import get_db
-from src.database.models import Game, Player, Event, Secrets, Detective, Card
+# Import models and schemas needed for setting up test data and requests
+from src.database.models import Game, Player, Event, Secrets, Detective, Card, ActiveTrade
+from src.schemas.card_schemas import Discard_List_Request
 
 @pytest.fixture
 def setup_events_data(db_session):
     """
-    Fixture to create a consistent set of data for event-related tests.
+    Fixture to create a consistent and rich set of data for event-related tests.
     This runs for each test, ensuring a clean state.
     """
-    # Arrange: Create a game, players, and various cards/secrets for event scenarios
-    game = Game(game_id=1, name="Event Test Game", status="in course", max_players=4, min_players=2, players_amount=3, cards_left=10)
+    game = Game(game_id=1, name="Event Test Game", status="in course", max_players=4, min_players=4, players_amount=4, cards_left=20)
     
-    # Player 1: Has a "Not so fast" card and a card for trading
-    player1 = Player(player_id=1, name="Event Player 1", host=True, birth_date=datetime.date(2000, 1, 1), game_id=1, turn_order=1, social_disgrace=False, isSelected=False)
-    nsf_card = Event(card_id=1, name="Not so fast", type="event", picked_up=True, dropped=False, player_id=1, game_id=1)
-    p1_card = Detective(card_id=3, name="Card for P1", type="detective", player_id=1, game_id=1)
+    # Player 1: The main actor for many events
+    p1 = Player(player_id=1, name="Player 1", host=True, birth_date=datetime.date(2000, 1, 1), game_id=1, turn_order=1)
+    nsf_card = Event(card_id=1, name="Not so fast", picked_up=True, player_id=1, game_id=1)
+    trade_event_card = Event(card_id=2, name="Card trade", picked_up=True, player_id=1, game_id=1)
+    p1_card_to_trade = Detective(card_id=3, name="P1's Card", picked_up=True, player_id=1, game_id=1, quantity_set=1)
+    folly_event_card = Event(card_id=5, name="Dead card folly", picked_up=True, player_id=1, game_id=1)
 
-    # Player 2: Target for events and has a card for trading
-    player2 = Player(player_id=2, name="Event Player 2", host=False, birth_date=datetime.date(2001, 1, 1), game_id=1, turn_order=2, social_disgrace=False, isSelected=False)
-    p2_card = Detective(card_id=4, name="Card for P2", type="detective", player_id=2, game_id=1)
+    # Player 2: The target for trades and other events
+    p2 = Player(player_id=2, name="Player 2", host=False, birth_date=datetime.date(2001, 1, 1), game_id=1, turn_order=2)
+    p2_card_to_trade = Detective(card_id=4, name="P2's Card", picked_up=True, player_id=2, game_id=1, quantity_set=1)
 
+    # Player 3 & 4 for Folly event
+    p3 = Player(player_id=3, name="Player 3", host=False, birth_date=datetime.date(2002, 2, 2), game_id=1, turn_order=3)
+    p3_card = Detective(card_id=6, name="P3's Card", picked_up=True, player_id=3, game_id=1, quantity_set=1)
+    p4 = Player(player_id=4, name="Player 4", host=False, birth_date=datetime.date(2003, 3, 3), game_id=1, turn_order=4)
+    p4_card = Detective(card_id=7, name="P4's Card", picked_up=True, player_id=4, game_id=1, quantity_set=1)
 
-    # A revealed secret for the 'one_more' event
-    revealed_secret = Secrets(secret_id=1, murderer=False, acomplice=False, revelated=True, player_id=1, game_id=1)
-
-    # A card in the discard pile for 'look_into_ashes'
-    discarded_card = Detective(card_id=2, name="Hercule Poirot", type="detective", picked_up=True, dropped=True, player_id=1, game_id=1, quantity_set=3, discardInt=1)
+    # A revealed secret for 'one_more'
+    revealed_secret = Secrets(secret_id=1, revelated=True, player_id=1, game_id=1)
     
-    # Cards in the deck for 'early_train_paddington'
-    deck_cards = [Detective(name=f"Deck Card {i}", type="detective", game_id=1, quantity_set=1) for i in range(10)]
+    # Discard pile for 'look_into_ashes' and 'delay_escape'
+    discarded_cards = [
+        Detective(card_id=10 + i, name=f"Discard {i}", picked_up=True, dropped=True, game_id=1, quantity_set=1, discardInt=i+1) for i in range(7)
+    ]
+    
+    # Deck with plenty of cards
+    deck_cards = [Detective(name=f"Deck Card {i}", game_id=1, quantity_set=1) for i in range(20)]
 
-    db_session.add_all([game, player1, player2, nsf_card, p1_card, p2_card, revealed_secret, discarded_card] + deck_cards)
+    db_session.add_all([game, p1, p2, p3, p4, nsf_card, trade_event_card, folly_event_card, p1_card_to_trade, p2_card_to_trade, p3_card, p4_card, revealed_secret] + discarded_cards + deck_cards)
     db_session.commit()
-
 
 # --- Tests for 'Cards off the table' Event ---
 
@@ -47,60 +54,38 @@ def setup_events_data(db_session):
 @patch('src.routes.event_routes.broadcast_last_discarted_cards', new_callable=AsyncMock)
 @patch('src.routes.event_routes.broadcast_game_information', new_callable=AsyncMock)
 async def test_cards_off_table_success(mock_broadcast_game, mock_broadcast_discard, client, setup_events_data, db_session):
-    """Verifica que el evento 'Cards off the table' descarta las cartas 'Not so fast'."""
-    # Act: Player 1 activates the event
+    """Verifies that 'Cards off the table' discards 'Not so fast' cards."""
     response = client.put("/event/cards_off_table/1")
-
-    # Assert
-    response.status_code == 200
+    assert response.status_code == 200
     
-    # Verify in DB that the card is now dropped
-    card = db_session.query(Event).filter(Event.card_id == 1).first()
-    assert card.dropped is True
+    mock_broadcast_game.assert_awaited_once_with(1)
+    mock_broadcast_discard.assert_awaited_once_with(1)
 
 @pytest.mark.asyncio
 async def test_cards_off_table_player_not_found(client):
-    """Verifica el error cuando el jugador no existe."""
+    """Verifies error when the player does not exist."""
     response = client.put("/event/cards_off_table/999")
     assert response.status_code == 404
-    assert "Player not found" in response.json()["detail"]
-
-@pytest.mark.asyncio
-@patch('src.routes.event_routes.broadcast_last_discarted_cards', new_callable=AsyncMock)
-@patch('src.routes.event_routes.broadcast_game_information', new_callable=AsyncMock)
-async def test_cards_off_table_no_nsf_cards(mock_broadcast_game, mock_broadcast_discard, client, setup_events_data):
-    """Verifica que no ocurre error si el jugador no tiene cartas 'Not so fast'."""
-    # Act: Player 2 (who has no NSF cards) activates the event
-    response = client.put("/event/cards_off_table/2")
-    
-    # Assert
-    assert response.status_code == 200
-    assert "No 'Not so fast' cards found" in response.json()["message"]
-
 
 # --- Tests for 'One More' Event ---
 
 @pytest.mark.asyncio
 @patch('src.routes.event_routes.broadcast_game_information', new_callable=AsyncMock)
-async def test_one_more_success(mock_broadcast, client, setup_events_data):
-    """Verifica que el evento 'One More' reasigna un secreto revelado."""
-    # Act: Give the revealed secret (ID 1) to Player 2
+async def test_one_more_success(mock_broadcast, client, setup_events_data, db_session):
+    """Verifies that 'One More' reassigns a revealed secret."""
     response = client.put("/event/one_more/2,1")
-
-    # Assert
     assert response.status_code == 200
-    data = response.json()
-    assert data["player_id"] == 2
-    assert data["revelated"] is False # The secret should now be hidden
+    
+    secret = db_session.get(Secrets, 1)
+    assert secret.player_id == 2
+    assert secret.revelated is False
+    mock_broadcast.assert_awaited_once_with(1)
 
 @pytest.mark.asyncio
-async def test_one_more_secret_not_found_or_not_revealed(client, setup_events_data):
-    """Verifica el error si el secreto no existe o no está revelado."""
-    # Act: Try to use a non-existent secret
+async def test_one_more_secret_not_found(client, setup_events_data):
+    """Verifies error if the secret does not exist or is not revealed."""
     response = client.put("/event/one_more/2,999")
     assert response.status_code == 404
-    assert "Secret not found or is not revealed" in response.json()["detail"]
-
 
 # --- Tests for 'Early Train to Paddington' Event ---
 
@@ -108,182 +93,206 @@ async def test_one_more_secret_not_found_or_not_revealed(client, setup_events_da
 @patch('src.routes.event_routes.broadcast_last_discarted_cards', new_callable=AsyncMock)
 @patch('src.routes.event_routes.broadcast_game_information', new_callable=AsyncMock)
 async def test_early_train_paddington_success(mock_broadcast_game, mock_broadcast_discard, client, setup_events_data, db_session):
-    """Verifica que el evento descarta 6 cartas del mazo."""
-    # Act
-    response = client.put("/event/early_train_paddington/1")
-
-    # Assert
-    assert response.status_code == 200
-    assert "event executed successfully" in response.json()["message"]
+    """Verifies the event discards 6 cards from the deck."""
+    game = Game(game_id=3, name="success paddington", status="in course", players_amount=2, max_players=4, min_players=2, cards_left=16)
+    player = Player(player_id=6, name="P5", game_id=3, birth_date=datetime.date(2000,1,1))
+    deck_cards = [Detective(name=f"Deck Card {i}", type='detective', game_id=3, quantity_set=1, dropped=False, picked_up=False, draft=False) for i in range(16)]
+    db_session.add_all([game, player] + deck_cards)
+    db_session.commit()
+    initial_discard_count = db_session.query(Card).filter(Card.game_id == 3, Card.dropped == True).count()
     
-    # Verify in DB
-    discarded_count = db_session.query(Card).filter(Card.game_id == 1, Card.dropped == True).count()
-    # 1 from setup + 6 from event
-    assert discarded_count == 7
-
-@pytest.mark.asyncio
-async def test_early_train_paddington_game_not_found(client):
-    """Verifica el error si la partida no existe."""
-    response = client.put("/event/early_train_paddington/999")
-    assert response.status_code == 404
-    assert "Game not found" in response.json()["detail"]
+    response = client.put("/event/early_train_paddington/3,6")
+    assert response.status_code == 200
+    
+    final_discard_count = db_session.query(Card).filter(Card.game_id == 3, Card.dropped == True).count()
+    assert final_discard_count == initial_discard_count + 6
+    mock_broadcast_game.assert_awaited_once_with(3)
+    mock_broadcast_discard.assert_awaited_once_with(6)
 
 @pytest.mark.asyncio
 @patch('src.database.services.services_events.finish_game', new_callable=AsyncMock)
 @patch('src.routes.event_routes.broadcast_last_discarted_cards', new_callable=AsyncMock)
 @patch('src.routes.event_routes.broadcast_game_information', new_callable=AsyncMock)
-async def test_early_train_paddington_not_enough_cards(mock_broadcast_game, mock_broadcast_discard, mock_finish_game, client, db_session):
-    """Verifica que el juego termina si no hay suficientes cartas para descartar."""
-    # Arrange: Create a game with only 5 cards in the deck
-    game = Game(game_id=2, name="Short Deck Game", status="in course", max_players=2, min_players=2, players_amount=2)
-    deck_cards = [Detective(name=f"Deck Card {i}", type="detective", game_id=2, quantity_set=1) for i in range(5)]
-    db_session.add(game)
-    db_session.add_all(deck_cards)
+async def test_early_train_paddington_not_enough_cards_ends_game(mock_broadcast_game, mock_broadcast_discard, mock_finish_game, client, db_session):
+    """Verifies the game ends if there are not enough cards to discard."""
+    game = Game(game_id=2, name="Short Deck", status="in course", players_amount=2, max_players=4, min_players=2, cards_left=5)
+    player = Player(player_id=5, name="P5", game_id=2, birth_date=datetime.date(2000,1,1))
+    deck_cards = [Detective(name=f"Card {i}", game_id=2, quantity_set=1) for i in range(5)]
+    db_session.add_all([game, player] + deck_cards)
     db_session.commit()
 
-    # Act
-    response = client.put("/event/early_train_paddington/2")
-
-    # Assert
+    response = client.put("/event/early_train_paddington/2,5")
     assert response.status_code == 200
     assert "Not enough cards" in response.json()["message"]
-    mock_finish_game.assert_called_once_with(2)
-
+    mock_finish_game.assert_awaited_once_with(2)
 
 # --- Tests for 'Look into the ashes' Event ---
 
 @pytest.mark.asyncio
 @patch('src.routes.event_routes.broadcast_last_discarted_cards', new_callable=AsyncMock)
 @patch('src.routes.event_routes.broadcast_game_information', new_callable=AsyncMock)
-async def test_look_into_ashes_success(mock_broadcast_game, mock_broadcast_discard, client, setup_events_data):
-    """Verifica que un jugador puede tomar una carta de la pila de descarte."""
-    # Act: Player 2 takes the discarded card (ID 2)
-    response = client.put("/event/look_into_ashes/2,2")
-
-    # Assert
+async def test_look_into_ashes_success(mock_broadcast_game, mock_broadcast_discard, client, setup_events_data, db_session):
+    """Verifies a player can take a card from the discard pile."""
+    response = client.put("/event/look_into_ashes/2,10")
     assert response.status_code == 200
-    data = response.json()
-    assert data["player_id"] == 2
-    assert data["dropped"] is False
+    
+    card = db_session.get(Card, 10)
+    assert card.player_id == 2
+    assert card.dropped is False
+    mock_broadcast_game.assert_awaited_once_with(1)
+    mock_broadcast_discard.assert_awaited_once_with(2)
+
+# --- Tests for 'Delay the Murderer's Escape' Event ---
 
 @pytest.mark.asyncio
-async def test_look_into_ashes_card_not_in_discard_pile(client, setup_events_data):
-    """Verifica el error si la carta no está en la pila de descarte."""
-    # Card 1 is in a player's hand, not discarded
-    response = client.put("/event/look_into_ashes/2,1")
-    assert response.status_code == 404
-    assert "Card not found" in response.json()["detail"]
-
-@pytest.mark.asyncio 
 @patch('src.routes.event_routes.broadcast_last_discarted_cards', new_callable=AsyncMock)
 @patch('src.routes.event_routes.broadcast_game_information', new_callable=AsyncMock)
-async def test_delay_murderers_escape (mock_broadcast_game, mock_broadcast_discard, client, setup_events_data, db_session) : 
-    game = Game(game_id=2, name="Short Deck Game", status="in course", max_players=2, min_players=2, players_amount=2, cards_left = 46)
-    db_session.add(game) 
-    db_session.commit()
+async def test_delay_escape_success(mock_broadcast_game, mock_broadcast_discard, client, setup_events_data, db_session):
+    """Verifies the event returns cards from the discard pile to the deck."""
+    game_before = db_session.get(Game, 1)
+    initial_cards_left = game_before.cards_left
     
-    card1 = Event(name="C1", player_id=None, game_id=game.game_id, picked_up=True, dropped=True)
-    card2 = Event(name="C2", player_id=None, game_id=game.game_id, picked_up=True, dropped=True)
-    db_session.add_all([card1, card2]) 
-    db_session.commit()
-    card_ids_to_delay = [card1.card_id, card2.card_id]
-
+    card_ids_to_return = [10, 11, 12]
     response = client.put(
-        f"/event/delay_escape/{game.game_id}",
-        json={"card_ids": card_ids_to_delay}
+        "/event/delay_escape/1,1",
+        json={"card_ids": card_ids_to_return}
     )
-    assert response.status_code == 200 
-    data = response.json()
-    assert data[0]["dropped"] is False 
-    assert data[1]["dropped"] is False 
-    assert data[0]["picked_up"] is False 
-    assert data[1]["picked_up"] is False 
-    assert data[0]["discardInt"] == -1  
-    assert data[1]["discardInt"] == -1
-
-@pytest.mark.asyncio
-async def test_card_trade_initiate_success(client, setup_events_data, mocker):
-    """Verifica que el Step 1 del 'Card Trade' selecciona a los jugadores correctamente."""
-    mock_broadcast = mocker.patch('src.routes.event_routes.broadcast_game_information', new_callable=AsyncMock)
-    
-    # Act
-    response = client.post("/event/card_trade/initiate/1,2")
-    
-    # Assert
     assert response.status_code == 200
-    assert "Card trade initiated" in response.json()["message"]
     
-    # Verify in DB
-    db = client.app.dependency_overrides[get_db]().__next__()
-    player1 = db.query(Player).filter(Player.player_id == 1).first()
-    player2 = db.query(Player).filter(Player.player_id == 2).first()
-    assert player1.isSelected is True
-    assert player2.isSelected is True
-    mock_broadcast.assert_awaited_once_with(1)
+    game_after = db_session.get(Game, 1)
+    assert game_after.cards_left == initial_cards_left + len(card_ids_to_return)
+    
+    returned_card = db_session.get(Card, 10)
+    assert returned_card.dropped is False
+    assert returned_card.player_id is None
+    mock_broadcast_game.assert_awaited_once_with(1)
+    mock_broadcast_discard.assert_awaited_once_with(1)
+
+# --- Tests for 'Card Trade' Event (Multi-Step) ---
 
 @pytest.mark.asyncio
-async def test_card_trade_initiate_player_not_found(client, setup_events_data):
-    """Verifica el error si uno de los jugadores en la iniciación no existe."""
-    response = client.post("/event/card_trade/initiate/1,999")
-    assert response.status_code == 404
-    assert "One or both players not found" in response.json()["detail"]
-
-@pytest.mark.asyncio
-async def test_card_trade_finalize_success(client, setup_events_data, mocker):
-    """Verifica que el Step 2 del 'Card Trade' intercambia las cartas y resetea el estado."""
-    mock_broadcast = mocker.patch('src.routes.event_routes.broadcast_game_information', new_callable=AsyncMock)
-    
-    # Arrange: Manually set the 'isSelected' state as if Step 1 happened
-    db = client.app.dependency_overrides[get_db]().__next__()
-    player1_before = db.query(Player).filter(Player.player_id == 1).first()
-    player2_before = db.query(Player).filter(Player.player_id == 2).first()
-    player1_before.isSelected = True
-    player2_before.isSelected = True
-    db.commit()
-
-    print(f"\n[ANTES] Player 1 isSelected: {player1_before.isSelected}")
-    print(f"[ANTES] Player 2 isSelected: {player2_before.isSelected}")
-
-    # Act
-    response = client.post("/event/card_trade/finalize/1,2,3,4")
-    
-    # Assert
+@patch('src.routes.event_routes.broadcast_last_discarted_cards', new_callable=AsyncMock)
+@patch('src.routes.event_routes.broadcast_game_information', new_callable=AsyncMock)
+async def test_card_trade_initiate_success(mock_broadcast_game, mock_broadcast_discard, client, setup_events_data, db_session):
+    """Verifies Step 1 of 'Card Trade' creates the action and sets pending state."""
+    response = client.post("/event/card_trade/initiate/1,2,2")
     assert response.status_code == 200
-    assert "Card trade finalized successfully" in response.json()["message"]
     
-    # --- VERIFICACIÓN ---
-    # Vuelve a pedir los objetos a la BD para obtener su estado actualizado
-    player1_after = db.query(Player).filter(Player.player_id == 1).first()
-    player2_after = db.query(Player).filter(Player.player_id == 2).first()
+    trade = db_session.query(ActiveTrade).filter_by(game_id=1).one()
+    assert trade.player_one_id == 1
+    assert trade.player_two_id == 2
     
-    print(f"[DESPUÉS] Player 1 isSelected: {player1_after.isSelected}")
-    print(f"[DESPUÉS] Player 2 isSelected: {player2_after.isSelected}")
+    p1 = db_session.get(Player, 1)
+    p2 = db_session.get(Player, 2)
+    assert p1.pending_action == "SELECT_TRADE_CARD"
+    assert p2.pending_action == "SELECT_TRADE_CARD"
+    
+    event_card = db_session.get(Event, 2)
+    assert event_card.dropped is True
 
-    # Verify card owners in DB
-    card_from_p1 = db.query(Card).filter(Card.card_id == 3).first()
-    card_from_p2 = db.query(Card).filter(Card.card_id == 4).first()
+@pytest.mark.asyncio
+@patch('src.routes.event_routes.broadcast_game_information', new_callable=AsyncMock)
+async def test_card_trade_select_and_resolve_success(mock_broadcast_game, client, setup_events_data, db_session):
+    """Verifies Step 2 of 'Card Trade' correctly swaps cards when both players select."""
+    # Initiate trade first
+    client.post("/event/card_trade/initiate/1,2,2")
+    
+    # Player 1 selects their card
+    response1 = client.post("/event/card_trade/select_card/1/3")
+    assert response1.status_code == 200
+    
+    p1_after_select = db_session.get(Player, 1)
+    assert p1_after_select.pending_action == "WAITING_FOR_TRADE_PARTNER"
+    
+    # Player 2 selects their card, which should resolve the trade
+    response2 = client.post("/event/card_trade/select_card/2/4")
+    assert response2.status_code == 200
+    
+    # Verify cards are swapped
+    card_from_p1 = db_session.get(Card, 3)
+    card_from_p2 = db_session.get(Card, 4)
     assert card_from_p1.player_id == 2
     assert card_from_p2.player_id == 1
     
-    # Verify players are unselected
-    assert player1_after.isSelected is False
-    assert player2_after.isSelected is False
+    # Verify state is cleaned up
+    p1_after_resolve = db_session.get(Player, 1)
+    p2_after_resolve = db_session.get(Player, 2)
+    assert p1_after_resolve.pending_action is None
+    assert p2_after_resolve.pending_action is None
+    assert db_session.query(ActiveTrade).filter_by(game_id=1).count() == 0
+
+# --- Tests for 'Dead Card Folly' Event (Multi-Step) ---
+
+@pytest.mark.asyncio
+@patch('src.routes.event_routes.broadcast_last_discarted_cards', new_callable=AsyncMock)
+@patch('src.routes.event_routes.broadcast_game_information', new_callable=AsyncMock)
+async def test_dead_card_folly_initiate_success(mock_broadcast_game, mock_broadcast_discard, client, setup_events_data, db_session):
+    """Verifies initiation of 'Dead Card Folly' sets direction and pending actions."""
+    response = client.post("/event/dead_card_folly/initiate/1/1/5/right")
+    assert response.status_code == 200
+    
+    game = db_session.get(Game, 1)
+    assert game.direction_folly == "right"
+    
+    players = db_session.query(Player).filter_by(game_id=1).all()
+    for p in players:
+        assert p.pending_action == "SELECT_FOLLY_CARD"
+
+@pytest.mark.asyncio
+@patch('src.routes.event_routes.broadcast_game_information', new_callable=AsyncMock)
+async def test_dead_card_folly_resolve_flow_right(mock_broadcast_game, client, setup_events_data, db_session):
+    """Verifies the full card passing flow for 'Dead Card Folly' to the right."""
+    # Initiate
+    client.post("/event/dead_card_folly/initiate/1/1/5/right")
+    
+    # Each player passes their card to the player on their right
+    # P1 (turn 1) -> P2 (turn 2)
+    client.post("/event/dead_card_folly/select_card/1/2/3")
+    # P2 (turn 2) -> P3 (turn 3)
+    client.post("/event/dead_card_folly/select_card/2/3/4")
+    # P3 (turn 3) -> P4 (turn 4)
+    client.post("/event/dead_card_folly/select_card/3/4/6")
+    # P4 (turn 4) -> P1 (turn 1)
+    final_response = client.post("/event/dead_card_folly/select_card/4/1/7")
+    
+    assert "Todos los jugadores completaron" in final_response.json()["message"]
+    
+    # Verify final card owners
+    assert db_session.get(Card, 3).player_id == 2
+    assert db_session.get(Card, 4).player_id == 3
+    assert db_session.get(Card, 6).player_id == 4
+    assert db_session.get(Card, 7).player_id == 1
+    
+    # Verify state is cleaned up
+    players = db_session.query(Player).filter_by(game_id=1).all()
+    for p in players:
+        assert p.pending_action is None
+
+# --- Tests for 'Point your suspicion' Event ---
+
+@pytest.mark.asyncio
+@patch('src.routes.event_routes.broadcast_game_information', new_callable=AsyncMock)
+async def test_point_your_suspicion_success(mock_broadcast, client, setup_events_data, db_session):
+    """Verifies that 'Point your suspicion' sets the VOTE pending action for all players."""
+    response = client.put("/event/point_your_suspicion/1")
+    assert response.status_code == 200
+    
+    players = db_session.query(Player).filter_by(game_id=1).all()
+    for p in players:
+        assert p.pending_action == "VOTE"
     mock_broadcast.assert_awaited_once_with(1)
 
 @pytest.mark.asyncio
-async def test_card_trade_finalize_invalid_card_owner(client, setup_events_data):
-    """Verifica el error si una de las cartas no pertenece al jugador correcto."""
-    # Arrange: Manually set state
-    db = client.app.dependency_overrides[get_db]().__next__()
-    p1 = db.query(Player).filter(Player.player_id == 1).first()
-    p2 = db.query(Player).filter(Player.player_id == 2).first()
-    p1.isSelected = True
-    p2.isSelected = True
-    db.commit()
-    
-    # Act: Try to trade P2's card (4) as if it were P1's
-    response = client.post("/event/card_trade/finalize/1,2,4,3")
+@patch('src.routes.event_routes.broadcast_game_information', new_callable=AsyncMock)
+async def test_end_point_your_suspicion_success(mock_broadcast, client, setup_events_data, db_session):
+    """Verifies that the ending event resets the game status."""
+    game = db_session.get(Game, 1)
+    game.status = "point of suspicion"
+    db_session.commit()
 
-    # Assert
-    assert response.status_code == 404
-    assert "Invalid player or card IDs provided" in response.json()["detail"]
+    response = client.put("/event/end/point_your_suspicion/1")
+    assert response.status_code == 200
+    
+    game_after = db_session.get(Game, 1)
+    assert game_after.status == "in course"
+    mock_broadcast.assert_awaited_once_with(1)

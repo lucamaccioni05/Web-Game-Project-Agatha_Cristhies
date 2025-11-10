@@ -179,53 +179,36 @@ async def early_train_paddington(game_id: int, db: Session):
     """
     Implement the effect of the 'Early Train to Paddington' event.
     """
-    deck = (
-        db.query(Card)
-        .filter(
-            Card.game_id == game_id,
-            Card.picked_up == False,
-            Card.draft == False,
-            Card.dropped == False,
-        )
-        .all()
-    )
+    deck = db.query(Card).filter(Card.game_id == game_id, Card.picked_up == False, Card.draft == False, Card.dropped == False).all()
+    
     game = db.query(Game).filter(Game.game_id == game_id).first()
     if not game:
         raise HTTPException(status_code=404, detail="Game not found.")
-    if not deck:
-        raise HTTPException(status_code=404, detail="Deck not found.")
-
-    if len(deck) < 6:
-        await finish_game(
-            game_id
-        )  # se termina el juego si no hay mas cartas en el mazo
-        return {"message": "Not enough cards in the deck. The game has ended."}
 
     random.shuffle(deck)
     try:
-        max_discardInt = (
-            db.query(func.max(Card.discardInt)).filter(Card.game_id == game_id).scalar()
-            or 0
-        )
+        if len(deck) < 6:
+            await finish_game(game_id)  # se termina el juego si no hay mas cartas en el mazo
+            return {"message": "Not enough cards in the deck. The game has ended."}
+
+        max_discardInt = db.query(func.max(Card.discardInt)).filter(Card.game_id == game_id).scalar() or 0
+        print(max_discardInt) 
         cards_to_discard = deck[:6]
         for card in cards_to_discard:
             card.dropped = True
             card.picked_up = False
             max_discardInt += 1
-            card.discardInt = (
-                max_discardInt  # Asigna el siguiente valor en la secuencia
-            )
+            card.discardInt = max_discardInt
         game.cards_left -= 6
         db.commit()
         for card in cards_to_discard:
             db.refresh(card)
+        db.refresh(game)
         return {"message": "Early Train to Paddington event executed successfully."}
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=400,
-            detail=f"Error executing 'Early Train to Paddington' event: {str(e)}",
-        )
+        print(str(e))
+        raise HTTPException(status_code=400, detail=f"Error executing 'Early Train to Paddington' event: {str(e)}")
 
 
 def _execute_trade(
