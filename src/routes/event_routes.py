@@ -158,8 +158,12 @@ async def activate_card_trade_select_card(player_id: int, card_id: int, db: Sess
 async def activate_blackmailed(player_id_from : int, player_id_to : int, secret_id : int, db : Session = Depends (get_db)) :
     player_showing =  db.query(Player).filter(Player.player_id == player_id_from).first()
     player_showed = db.query(Player).filter(Player.player_id == player_id_to).first()
-    if not player_showed or player_showing : 
-        raise HTTPException(status_code=404, detail="Players not found.")
+    print("player_showing:",player_id_to)
+    print("player_showed:",player_id_from)
+    if not player_showed: 
+        raise HTTPException(status_code=404, detail="Players showed not found.")
+    if not player_showing : 
+        raise HTTPException(status_code=404, detail="Players showeding not found.")
     game_id = player_showed.game_id
     player_showing.pending_action = "BLACKMAILED"
     player_showed.pending_action = "BLACKMAILED"
@@ -177,12 +181,14 @@ async def activate_blackmailed(player_id_from : int, player_id_to : int, secret_
     return secret 
 
 
-@events.post("/event/blackmailed/deactivate/{player_id_from}/,{player_id_to}", status_code= 200, response_model= Secret_Response,  tags = ["Events"])
+@events.post("/event/blackmailed/deactivate/{player_id_from},{player_id_to}", status_code= 200, response_model= Secret_Response,  tags = ["Events"])
 async def deactivate_blackmailed(player_id_from : int, player_id_to : int, db : Session = Depends (get_db)) :
     player_showing =  db.query(Player).filter(Player.player_id == player_id_from).first()
     player_showed = db.query(Player).filter(Player.player_id == player_id_to).first()
-    if not player_showed or player_showing : 
-        raise HTTPException(status_code=404, detail="Players not found.")
+    if not player_showed: 
+        raise HTTPException(status_code=404, detail="Players showed not found.")
+    if not player_showing : 
+        raise HTTPException(status_code=404, detail="Players showeding not found.")
     game_id = player_showed.game_id
     player_showing.pending_action = None
     player_showed.pending_action = None
