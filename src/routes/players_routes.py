@@ -28,13 +28,30 @@ def list_players(game_id: int, db: Session = Depends(get_db)):
 
 @player.post("/players", status_code=201, tags=["Players"])
 def create_player(player: Player_Base, db: Session = Depends(get_db)):
-    new_player = Player(
-        name=player.name,
-        host=player.host,
-        game_id=player.game_id,
-        birth_date=player.birth_date,
-        avatar=player.avatar,
-    )
+    players = db.query(Player).filter(Player.game_id == player.game_id).all()
+    iterador = 1
+    if not players:
+        new_player = Player(
+            name=player.name,
+            host=player.host,
+            game_id=player.game_id,
+            birth_date=player.birth_date,
+            avatar=player.avatar,
+        )
+    else:
+        new_name = player.name
+        for p in players:
+            if p.name == new_name:
+                iterador += 1
+                new_name = f"{player.name} ({iterador})"
+                
+        new_player = Player(
+                name=new_name,
+                host=player.host,
+                game_id=player.game_id,
+                birth_date=player.birth_date,
+                avatar=player.avatar,
+            )
     game = db.get(Game, new_player.game_id)
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
