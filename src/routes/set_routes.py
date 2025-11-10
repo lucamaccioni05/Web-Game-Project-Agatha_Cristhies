@@ -90,7 +90,7 @@ async def play_set_of2(card_id : int , card_id_2:int , db:Session=Depends(get_db
     db.refresh(card_1)
     db.refresh(card_2)
     db.refresh(game)
-    await broadcast_player_state(game_id)
+    # await broadcast_player_state(game_id)
     return new_set
 
 @set.post("/sets_of3/{card_id},{card_id_2},{card_id_3}", status_code=201,response_model= Set_Base, tags = ["Sets"])
@@ -157,7 +157,7 @@ async def play_set_of3(card_id : int , card_id_2: int , card_id_3: int , db:Sess
     db.refresh(card_1)
     db.refresh(card_2)
     db.refresh(card_3)
-    await broadcast_player_state(card_1.game_id)
+    # await broadcast_player_state(card_1.game_id)
     return new_set
 
 @set.get("/sets/list/{player_id}", status_code = 201, response_model= Set_Response, tags = {"Sets"})
@@ -203,7 +203,7 @@ async def add_detective(card_id : int, set_id : int, db : Session = Depends(get_
         try : 
             db.commit()
             db.refresh(detective)
-            await broadcast_player_state(set.game_id)
+            # await broadcast_player_state(set.game_id)
             return set
         except Exception as e:
             db.rollback()
@@ -218,7 +218,7 @@ async def add_detective(card_id : int, set_id : int, db : Session = Depends(get_
         try : 
             db.commit()
             db.refresh(detective)
-            await broadcast_player_state(set.game_id)
+            # await broadcast_player_state(set.game_id)
             return set
         except Exception as e:
             db.rollback()
@@ -230,7 +230,7 @@ async def add_detective(card_id : int, set_id : int, db : Session = Depends(get_
         try : 
             db.commit()
             db.refresh(detective)
-            await broadcast_player_state(set.game_id)
+            # await broadcast_player_state(set.game_id)
             return set
         except Exception as e:
             db.rollback()
@@ -243,7 +243,7 @@ async def add_detective(card_id : int, set_id : int, db : Session = Depends(get_
         try : 
             db.commit()
             db.refresh(detective)
-            await broadcast_player_state(set.game_id)
+            # await broadcast_player_state(set.game_id)
             return set
         except Exception as e:
             db.rollback()

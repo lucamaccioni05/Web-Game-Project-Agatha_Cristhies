@@ -57,9 +57,10 @@ class Player(Base):
     )
     secrets = relationship("Secrets", back_populates="player")
     sets = relationship("Set", back_populates="player")
+    logs = relationship("Log", back_populates="player")
     social_disgrace = Column(
         Boolean, default=False
-    )  # Nueva columna para Social Disgrace
+    )
     pending_action = Column(String(50), nullable=True)
     votes_received = Column (Integer, default = 0)
 
@@ -151,6 +152,9 @@ class Log(Base):
     
     set_id = Column(Integer , ForeignKey("sets.set_id"), nullable=True)
     set = relationship("Set" , back_populates="log")
+
+    player_id = Column(Integer , ForeignKey("players.player_id"),nullable=False)
+    player = relationship("Player" , back_populates="logs")
     
     game_id = Column(Integer , ForeignKey("games.game_id"),nullable=False)
     game = relationship("Game" , back_populates="log")

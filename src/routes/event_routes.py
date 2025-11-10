@@ -285,15 +285,12 @@ async def activate_dead_card_folly_trade_select_card(
         await broadcast_game_information(from_player.game_id)
 
     return result
-        
-    return result
 
     
 @events.get("/events/count/Not_so_fast/{game_id}" , status_code=200, tags=["Events"])
 def count_NSF(game_id: int , db:Session = Depends(get_db)):
-    NSF_amount = count(game_id , db)
-    return NSF_amount
-
+    
+    return count(game_id , db)
     
 
     
