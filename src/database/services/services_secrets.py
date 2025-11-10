@@ -106,6 +106,17 @@ def update_social_disgrace(player: Player):
     all_secrets_revealed = (all(s.revelated for s in player.secrets) if player.secrets else False)
 
     player.social_disgrace = accomplice_revealed or all_secrets_revealed
+async def check_social_disgrace_win_condition(game_id: int, db: Session):
+    """
+    Verifica si todos los jugadores, excepto el asesino, están en desgracia social.
+    Si es así, el asesino gana y el juego termina.
+    """
+    murderer_player = (db.query(Player).join(Secrets).filter(Player.game_id == game_id, Secrets.murderer == True).first())
+
+    other_players = (db.query(Player).filter(Player.game_id == game_id, Player.player_id != murderer_player.player_id).all())
+
+    if other_players and all(p.social_disgrace for p in other_players):
+        await finish_game(game_id, db)
 
 
 async def reveal_secret(secret_id: int, db: Session):
@@ -135,6 +146,7 @@ async def reveal_secret(secret_id: int, db: Session):
     if player_in_turn and player_in_turn.pending_action == "WAITING_REVEAL_SECRET":
         player_in_turn.pending_action = "Clense"
 
+    await check_social_disgrace_win_condition(secret.game_id, db)
     try:
         db.commit()
         if player:

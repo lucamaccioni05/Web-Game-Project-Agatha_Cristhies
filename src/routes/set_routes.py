@@ -6,7 +6,8 @@ from src.database.database import SessionLocal, get_db
 from src.database.models import Card , Game , Detective , Event , Set, Player
 from src.database.services.services_cards import only_6
 from src.schemas.card_schemas import Card_Response , Detective_Response , Event_Response
-from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_player_state
+from src.database.services.services_websockets import broadcast_last_discarted_cards, broadcast_player_state, broadcast_last_cancelable_set
+from src.database.services.services_cards import register_cancelable_set
 import random
 
 set = APIRouter()
@@ -89,7 +90,7 @@ async def play_set_of2(card_id : int , card_id_2:int , db:Session=Depends(get_db
     db.refresh(card_1)
     db.refresh(card_2)
     db.refresh(game)
-    await broadcast_player_state(game_id)
+    # await broadcast_player_state(game_id)
     return new_set
 
 @set.post("/sets_of3/{card_id},{card_id_2},{card_id_3}", status_code=201,response_model= Set_Base, tags = ["Sets"])
@@ -156,7 +157,7 @@ async def play_set_of3(card_id : int , card_id_2: int , card_id_3: int , db:Sess
     db.refresh(card_1)
     db.refresh(card_2)
     db.refresh(card_3)
-    await broadcast_player_state(card_1.game_id)
+    # await broadcast_player_state(card_1.game_id)
     return new_set
 
 @set.get("/sets/list/{player_id}", status_code = 201, response_model= Set_Response, tags = {"Sets"})
@@ -202,7 +203,7 @@ async def add_detective(card_id : int, set_id : int, db : Session = Depends(get_
         try : 
             db.commit()
             db.refresh(detective)
-            await broadcast_player_state(set.game_id)
+            # await broadcast_player_state(set.game_id)
             return set
         except Exception as e:
             db.rollback()
@@ -217,7 +218,7 @@ async def add_detective(card_id : int, set_id : int, db : Session = Depends(get_
         try : 
             db.commit()
             db.refresh(detective)
-            await broadcast_player_state(set.game_id)
+            # await broadcast_player_state(set.game_id)
             return set
         except Exception as e:
             db.rollback()
@@ -229,7 +230,7 @@ async def add_detective(card_id : int, set_id : int, db : Session = Depends(get_
         try : 
             db.commit()
             db.refresh(detective)
-            await broadcast_player_state(set.game_id)
+            # await broadcast_player_state(set.game_id)
             return set
         except Exception as e:
             db.rollback()
@@ -242,11 +243,13 @@ async def add_detective(card_id : int, set_id : int, db : Session = Depends(get_
         try : 
             db.commit()
             db.refresh(detective)
-            await broadcast_player_state(set.game_id)
+            # await broadcast_player_state(set.game_id)
             return set
         except Exception as e:
             db.rollback()
             raise HTTPException(status_code=400, detail=f"Error adding set: {str(e)}")
+    else:
+        raise HTTPException(status_code=400, detail="Card is not compatible with this set")
         
     
 
