@@ -1,12 +1,13 @@
 from fastapi.encoders import jsonable_encoder
 from fastapi import HTTPException, WebSocket
 from sqlalchemy import desc, select, true, orm
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from src.schemas.card_schemas import Card_Response, AllCardsResponse
 from src.database.database import SessionLocal
-from src.database.models import Detective, Game, Player, Card, Event, Secrets
-from src.schemas.games_schemas import Game_Response
 from src.schemas.secret_schemas import Secret_Response
+from src.database.models import Detective, Game, Player, Card, Event,Secrets, Set, Log
+from src.schemas.games_schemas import Game_Response
+from src.schemas.set_schemas import Set_Response
 from src.webSocket.connection_manager import lobbyManager, gameManager
 from src.schemas.players_schemas import Player_Base, Player_State
 import json
@@ -63,7 +64,16 @@ async def broadcast_lobby_information(db: Session, game_id: int):
 async def broadcast_game_information(game_id: int):
     db = SessionLocal()
     try:
-        game = db.query(Game).filter(Game.game_id == game_id).first()
+        game = (
+            db.query(Game)
+            .options(
+                selectinload(Game.log).selectinload(Log.player),
+                selectinload(Game.log).selectinload(Log.card.of_type(Event)),
+                selectinload(Game.log).selectinload(Log.set)
+            )
+            .filter(Game.game_id == game_id)
+            .first()
+        )
         if not game:
             # Si el juego ya no existe, no hacemos nada.
             print(f"Intento de broadcast para un juego no existente: {game_id}")
@@ -76,7 +86,27 @@ async def broadcast_game_information(game_id: int):
             .all()
         )
 
-        gameResponse = Game_Response.model_validate(game).model_dump_json()
+        # a. Validamos el 'game' (Pydantic ignorará el 'log' porque no está en el dict)
+        game_dict = Game_Response.model_validate(game).model_dump()
+        
+        # b. Formateamos el log manualmente (reutilizando tu lógica de 'get_logs')
+        formatted_logs = []
+        for log in game.log: # 'game.log' está cargado gracias a selectinload
+            formatted_logs.append({
+                "log_id": log.log_id,
+                "created_at": log.created_at.isoformat(),
+                "type": log.type,
+                "player_id": log.player.player_id if log.player else None, 
+                "card_name": log.card.name if log.card and hasattr(log.card, 'name') else None,
+                "set_name": log.set.name if log.set else None
+            })
+        
+        # c. Añadimos el log formateado al diccionario
+        game_dict['log'] = formatted_logs
+        
+        # d. Convertimos el diccionario final (y limpio) a JSON
+        gameResponse = json.dumps(game_dict)
+
         playersStateResponse = [
             Player_State.model_validate(player) for player in players
         ]
@@ -235,3 +265,59 @@ async def broadcast_blackmailed(game_id: int, secret : Secrets): # Acepta el obj
         )
     finally:
         db.close()
+async def broadcast_last_cancelable_event(card_id : int):
+    db = SessionLocal()
+    try:
+        polymorphic_loader = orm.with_polymorphic(Card, [Detective, Event])
+        stmt = select(polymorphic_loader).where(Card.card_id == card_id)
+        card = db.execute(stmt).scalar_one_or_none()
+
+        if not card:
+            raise HTTPException(status_code=404, detail="Card not found")
+
+        game_id = card.game_id
+
+        card_adapter = TypeAdapter(AllCardsResponse)
+        card_response = card_adapter.validate_python(card, from_attributes=True)
+
+        card_json = jsonable_encoder(card_response)
+
+        await gameManager.broadcast(json.dumps({
+            "type": "cardResponse",
+            "data": card_json
+        }), game_id)
+
+    finally:
+        db.close()   
+
+async def broadcast_last_cancelable_set(set_id : int):
+    db = SessionLocal()
+    try:
+        stmt = select(Set).where(Set.set_id == set_id)
+        set = db.execute(stmt).scalar_one_or_none()
+
+        if not set:
+            raise HTTPException(status_code=404, detail="Set not found")
+
+        game_id = set.game_id
+
+        set_adapter = TypeAdapter(Set_Response)
+        set_response = set_adapter.validate_python(set, from_attributes=True)
+
+        set_json = jsonable_encoder(set_response)
+
+        await gameManager.broadcast(json.dumps({
+            "type": "setResponse",
+            "data": set_json
+        }), game_id)
+
+    finally:
+        db.close()   
+ 
+
+
+
+
+
+         
+    

@@ -3,7 +3,8 @@ from fastapi import Depends
 from src.database.database import SessionLocal, get_db
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from src.database.models import Player, Card , Detective , Event, Game
+from src.database.models import Player, Card , Detective , Event, Game , Log, Set
+from datetime import datetime , timezone , timedelta, tzinfo
 
 def setup_initial_draft_pile(game_id: int, db: Session):
     """
@@ -184,3 +185,140 @@ def only_6 (player_id , db: Session = Depends(get_db)):
         return True
     else:
         return False
+    
+def register_cancelable_event (card_id, db: Session= Depends(get_db)):
+    new_event = db.query(Event).filter(Event.card_id == card_id).first()
+    if not new_event:
+        raise HTTPException(status_code=404, detail="Card not found")
+
+    player_id = new_event.player_id
+    if not player_id:
+        raise HTTPException(status_code=400, detail="Card has no associated player.")
+
+    event_type = new_event.type 
+
+    event = Log(
+            card_id = new_event.card_id, 
+            game_id = new_event.game_id,
+            player_id = player_id,
+            type = event_type)
+    try:
+        db.add(event)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error creating cancelable event: {str(e)}")
+    
+    return new_event.game_id
+
+
+def register_cancelable_set (set_id, db: Session= Depends(get_db)):
+    new_set = db.query(Set).filter(Set.set_id == set_id).first()
+
+    if not new_set:
+        raise HTTPException(status_code=404, detail="Set not found")
+    
+    new_log = Log(set_id = new_set.set_id, 
+                game_id = new_set.game_id,
+                player_id = new_set.player_id,
+                type = "Set")
+    
+    try:
+        db.add(new_log)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error creating cancelable event: {str(e)}")
+    return new_set.game_id
+
+
+def count (game_id: int, db:Session= Depends(get_db)):
+    logs_con_todo = db.query(Log, Event, Set) \
+        .outerjoin(Event, Log.card_id == Event.card_id) \
+        .outerjoin(Set, Log.set_id == Set.set_id ) \
+        .filter(Log.game_id == game_id) \
+        .order_by(Log.created_at.desc()) \
+        .all()
+
+    if not logs_con_todo:
+        raise HTTPException(status_code=404, detail="There are no events to count")
+
+    newest_log, newest_event, newest_set = logs_con_todo[0]
+    newest_item = newest_event if newest_event else newest_set
+
+
+    nsf_count = 0
+    target_item = None 
+
+    for log, event, set_item in logs_con_todo:
+        if event and event.name == "Not so fast":
+            nsf_count += 1
+        else:
+            target_item = event if event else set_item
+            break 
+    
+    if target_item is None:
+        return newest_item
+
+    if nsf_count % 2 == 0:
+        return target_item
+    else:
+        return newest_item
+    
+    # last_cancelable_event = db.query(Log).filter(Log.game_id == new_event.game_id).order_by(Log.created_at.desc()).first()
+    # if not last_cancelable_event:
+    #     event = Log(
+    #             card_id = new_event.card_id, 
+    #             game_id = new_event.game_id,
+    #             player_id = new_event.player_id,
+    #             type = new_event.type)
+    #     try:
+    #         db.add(event)
+    #         db.commit()
+    #     except Exception as e:
+    #         db.rollback()
+    #         raise HTTPException(status_code=400, detail=f"Error creating cancelable event: {str(e)}")
+    #     return True
+    
+    # if new_event.name != "Not so fast":
+    #     event = Log(
+    #             card_id = new_event.card_id, 
+    #             game_id = new_event.game_id,
+    #             player_id = new_event.player_id,
+    #             type = new_event.type)
+    #     try:
+    #         db.add(event)
+    #         db.commit()
+    #     except Exception as e:
+    #         db.rollback()
+    #         raise HTTPException(status_code=400, detail=f"Error creating cancelable event: {str(e)}")
+    #     return True
+    
+    # time = datetime.now()
+    # time_db = last_cancelable_event.created_at
+
+    # if isinstance(time_db, str):
+    #     try:
+    #         time_db = datetime.fromisoformat(time_db)
+    #     except Exception:
+    #         raise HTTPException(status_code=500, detail="Invalid timestamp in DB")
+
+    # if time_db is None:
+    #     raise HTTPException(status_code=500, detail="Missing timestamp in DB")
+
+    # result = time- time_db
+    # if result < timedelta(seconds=5):
+    #     event = Log(
+    #             card_id = new_event.card_id, 
+    #             game_id = new_event.game_id,
+    #             player_id = new_event.player_id,
+    #             type = new_event.type)
+    #     try:
+    #         db.add(event)
+    #         db.commit()
+    #     except Exception as e:
+    #         db.rollback()
+    #         raise HTTPException(status_code=400, detail=f"Error creating cancelable event: {str(e)}")
+    #     return True
+    
+    # return False

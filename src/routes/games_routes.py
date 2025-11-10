@@ -2,7 +2,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, WebSocket  #te permite definir las rutas o subrutas por separado
 from sqlalchemy.orm import Session  
 from src.database.database import SessionLocal, get_db
-from src.database.models import Game 
+from src.database.models import Game, Log, Player 
 from src.schemas.games_schemas import Game_Base, Game_Response, Game_Initialized
 from src.database.services.services_games import assign_turn_to_players
 from src.database.services.services_cards import init_detective_cards , init_event_cards, deal_cards_to_players, setup_initial_draft_pile , deal_NSF
@@ -95,18 +95,37 @@ async def update_turn (game_id : int , db: Session = Depends(get_db)) :
     game = db.query(Game).where(Game.game_id == game_id).first()
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
+
     if game.current_turn < game.players_amount : 
         game.current_turn += 1 
     else : 
         game.current_turn = 1
+    
+    next_player = db.query(Player).filter(
+        Player.game_id == game_id,
+        Player.turn_order == game.current_turn # Usamos el 'game.current_turn' ya actualizado
+    ).first()
+
+    if not next_player:
+        raise HTTPException(status_code=404, detail="Next player not found for the new turn")
+
+    log_turn_change = Log(
+        game_id=game_id,
+        player_id=next_player.player_id, # El ID del jugador que *empieza*
+        type="TurnChange"
+    )
+    db.add(log_turn_change)
+    
     try:
         db.commit()
-        await broadcast_game_information(game_id)
+        # Tu broadcast_game_information (asumo) envía el estado actualizado
+        # del juego, que ahora incluye el nuevo log. ¡Esto es perfecto!
+        await broadcast_game_information(game_id) 
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Error updating turn's game: {str(e)}")
 
-    return game.current_turn
+    return game
 
 @game.get("/games/{game_id}", tags=["Games"])
 def get_game(game_id: int, db: Session = Depends(get_db)):
