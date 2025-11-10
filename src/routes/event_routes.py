@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import Secret
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 from src.database.database import SessionLocal, get_db
@@ -15,25 +16,23 @@ from src.database.models import (
 )
 from src.database.services.services_cards import only_6, replenish_draft_pile, register_cancelable_event, count
 from src.database.services.services_games import finish_game
+from src.schemas.secret_schemas import Secret_Response
+from src.database.services.services_websockets import  broadcast_blackmailed, broadcast_last_discarted_cards, broadcast_game_information , broadcast_player_state, broadcast_card_draft, broadcast_last_cancelable_event
 from src.schemas.card_schemas import Card_Response, Discard_List_Request, Event_Response
-from src.database.services.services_websockets import (
-    broadcast_last_discarted_cards,
-    broadcast_game_information,
-    broadcast_player_state,
-    broadcast_card_draft,
-    broadcast_last_cancelable_event
-)
 from src.database.services.services_events import (
     cards_off_table,
+    end_point_your_suspicion,
     look_into_ashes,
     one_more,
     early_train_paddington,
     delay_the_murderers_escape,
     initiate_card_trade,
+    point_your_suspicion,
+    select_card_for_folly_trade_service,
     select_card_for_trade_service,
     initiate_dead_card_folly,
     select_card_for_folly_trade_service,
-    point_your_suspicion, 
+    point_your_suspicion,
     end_point_your_suspicion
 )
 import random
@@ -181,15 +180,9 @@ async def activate_delay_murderers_escape(
     return discarded_cards
 
 
-# --- ¡RUTA MODIFICADA! ---
-@events.post(
-    "/event/card_trade/initiate/{trader_id},{tradee_id},{card_id}",
-    status_code=200,
-    tags=["Events"],
-)
-async def activate_card_trade_initiate(
-    trader_id: int, tradee_id: int, card_id: int, db: Session = Depends(get_db)
-):
+
+@events.post("/event/card_trade/initiate/{trader_id},{tradee_id},{card_id}", status_code=200, tags=["Events"])
+async def activate_card_trade_initiate(trader_id: int, tradee_id: int, card_id: int, db: Session = Depends(get_db)):
     """
     Ruta: Inicia el 'Card Trade', creando la acción y seteando 'pending_action'.
     """
@@ -219,18 +212,66 @@ async def activate_card_trade_select_card(
     Ruta: Un jugador selecciona una carta para el trade.
     El servicio maneja la lógica de esperar o ejecutar.
     """
-    # El servicio maneja toda la lógica
-    result = select_card_for_trade_service(player_id=player_id, card_id=card_id, db=db)
-
-    # El broadcast se queda aquí
+    
+    result = select_card_for_trade_service(player_id=player_id, db=db, card_id=card_id) # Ojo al orden
+    
+    
     player = db.query(Player).filter(Player.player_id == player_id).first()
     if player:
         await broadcast_game_information(player.game_id)
-
+        
     return result
 
+@events.post("/event/blackmailed/{player_id_from},{player_id_to},{secret_id}", status_code= 200, response_model= Secret_Response,  tags = ["Events"])
+async def activate_blackmailed(player_id_from : int, player_id_to : int, secret_id : int, db : Session = Depends (get_db)) :
+    player_showing =  db.query(Player).filter(Player.player_id == player_id_from).first()
+    player_showed = db.query(Player).filter(Player.player_id == player_id_to).first()
+    if not player_showed  : 
+        raise HTTPException(status_code=404, detail="Player showed not found.")
+    if not player_showing : 
+        raise HTTPException(status_code=404, detail="Player showing not found.")
+    game_id = player_showed.game_id
+    player_showing.pending_action = "BLACKMAILED"
+    player_showed.pending_action = "BLACKMAILED"
+    secret = db.query(Secrets).filter(Secrets.secret_id == secret_id).first()
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Error executing 'Blackmail' event: {str(e)}",
+        )
+    await broadcast_blackmailed(game_id, secret)
 
-#############################################################
+    return secret 
+
+
+@events.post("/event/blackmailed/deactivate/{player_id_from},{player_id_to}", status_code= 200,  tags = ["Events"])
+async def deactivate_blackmailed(player_id_from : int, player_id_to : int, db : Session = Depends (get_db)) :
+    player_showing =  db.query(Player).filter(Player.player_id == player_id_from).first()
+    player_showed = db.query(Player).filter(Player.player_id == player_id_to).first()
+    if not player_showed  : 
+        raise HTTPException(status_code=404, detail="Player showed not found.")
+    if not player_showing : 
+        raise HTTPException(status_code=404, detail="Player showing not found.")
+    game_id = player_showed.game_id
+    player_showing.pending_action = None
+    player_showed.pending_action = None
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Error executing 'Blackmail' event: {str(e)}",
+        )
+    await broadcast_game_information(game_id)
+
+    return None 
+   
+
+
 @events.post(
     "/event/dead_card_folly/initiate/{player_id}/{game_id}/{card_id}/{direction}",
     status_code=200,

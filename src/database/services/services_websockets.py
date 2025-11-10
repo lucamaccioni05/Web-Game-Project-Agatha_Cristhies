@@ -4,7 +4,8 @@ from sqlalchemy import desc, select, true, orm
 from sqlalchemy.orm import Session, selectinload
 from src.schemas.card_schemas import Card_Response, AllCardsResponse
 from src.database.database import SessionLocal
-from src.database.models import Detective, Game, Player, Card, Event, Set, Log
+from src.schemas.secret_schemas import Secret_Response
+from src.database.models import Detective, Game, Player, Card, Event,Secrets, Set, Log
 from src.schemas.games_schemas import Game_Response
 from src.schemas.set_schemas import Set_Response
 from src.webSocket.connection_manager import lobbyManager, gameManager
@@ -13,6 +14,12 @@ import json
 from sqlalchemy.orm import joinedload
 from pydantic import TypeAdapter
 from typing import Dict, Any
+from src.database.models import Secrets
+from src.schemas.secret_schemas import Secret_Response
+from fastapi.encoders import jsonable_encoder
+from sqlalchemy.orm import Session 
+from src.database.database import get_db 
+from fastapi import Depends, HTTPException 
 
 
 async def broadcast_available_games(db: Session):
@@ -225,6 +232,39 @@ async def broadcast_card_draft(game_id: int):
     finally:
         db.close()
 
+async def broadcast_blackmailed(game_id: int, secret : Secrets): # Acepta el objeto Secret
+    db = SessionLocal()
+    try:
+        game = db.query(Game).filter(Game.game_id == game_id).first()
+        if not game:
+            print(f"Intento de broadcast para un juego no existente: {game_id}")
+            return
+
+        players = (
+            db.query(Player)
+            .options(joinedload(Player.cards), joinedload(Player.secrets))
+            .filter(Player.game_id == game_id)
+            .all()
+        )
+
+        secretResponse = Secret_Response.model_validate(secret).model_dump_json()
+        playersStateResponse = [
+            Player_State.model_validate(player) for player in players
+        ]
+        playersStateResponseJson = jsonable_encoder(playersStateResponse)
+
+        # Broadcast del secreto (con el 'type' correcto para el frontend)
+        await gameManager.broadcast(
+            json.dumps({"type": "blackmailed", "data": secretResponse}), game_id
+        )
+
+        # Broadcast del estado de jugadores (aún necesario)
+        await gameManager.broadcast(
+            json.dumps({"type": "playersState", "data": playersStateResponseJson}),
+            game_id,
+        )
+    finally:
+        db.close()
 async def broadcast_last_cancelable_event(card_id : int):
     db = SessionLocal()
     try:
