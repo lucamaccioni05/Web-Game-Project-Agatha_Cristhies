@@ -142,14 +142,12 @@ async def activate_card_trade_select_card(player_id: int, card_id: int, db: Sess
     Ruta: Un jugador selecciona una carta para el trade.
     El servicio maneja la lógica de esperar o ejecutar.
     """
-    # El servicio (sincrónico) hace toda la lógica de DB
+    
     result = select_card_for_trade_service(player_id=player_id, db=db, card_id=card_id) # Ojo al orden
     
-    # El broadcast se queda aquí (¡Y es ASYNC!)
+    
     player = db.query(Player).filter(Player.player_id == player_id).first()
     if player:
-        # ¡ESTA ES LA LÍNEA MÁS IMPORTANTE!
-        # Anuncia los cambios (nuevos pending_action, etc.) a todos
         await broadcast_game_information(player.game_id)
         
     return result
@@ -158,12 +156,10 @@ async def activate_card_trade_select_card(player_id: int, card_id: int, db: Sess
 async def activate_blackmailed(player_id_from : int, player_id_to : int, secret_id : int, db : Session = Depends (get_db)) :
     player_showing =  db.query(Player).filter(Player.player_id == player_id_from).first()
     player_showed = db.query(Player).filter(Player.player_id == player_id_to).first()
-    print("player_showing:",player_id_to)
-    print("player_showed:",player_id_from)
-    if not player_showed: 
-        raise HTTPException(status_code=404, detail="Players showed not found.")
+    if not player_showed  : 
+        raise HTTPException(status_code=404, detail="Player showed not found.")
     if not player_showing : 
-        raise HTTPException(status_code=404, detail="Players showeding not found.")
+        raise HTTPException(status_code=404, detail="Player showing not found.")
     game_id = player_showed.game_id
     player_showing.pending_action = "BLACKMAILED"
     player_showed.pending_action = "BLACKMAILED"
@@ -185,10 +181,10 @@ async def activate_blackmailed(player_id_from : int, player_id_to : int, secret_
 async def deactivate_blackmailed(player_id_from : int, player_id_to : int, db : Session = Depends (get_db)) :
     player_showing =  db.query(Player).filter(Player.player_id == player_id_from).first()
     player_showed = db.query(Player).filter(Player.player_id == player_id_to).first()
-    if not player_showed: 
-        raise HTTPException(status_code=404, detail="Players showed not found.")
+    if not player_showed  : 
+        raise HTTPException(status_code=404, detail="Player showed not found.")
     if not player_showing : 
-        raise HTTPException(status_code=404, detail="Players showeding not found.")
+        raise HTTPException(status_code=404, detail="Player showing not found.")
     game_id = player_showed.game_id
     player_showing.pending_action = None
     player_showed.pending_action = None

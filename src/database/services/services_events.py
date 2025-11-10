@@ -292,38 +292,41 @@ def select_card_for_trade_service(player_id: int, db: Session, card_id: int):
             stmt = select(polymorphic_loader).where(Card.card_id.in_([card_1_id, card_2_id]))
             cards_involved = db.execute(stmt).scalars().all()
             
-            # --- INICIO DEL BLOQUE RE-INDENTADO ---
-            # (Todo este bloque ahora está DENTRO del if 'trade listo')
-            
             blackmail_detected = False
+            social_faux_paus_detected = False
             for card in cards_involved:
                 if card.type == "event" and card.name == "Blackmailed":
                     blackmail_detected = True
-                    # Determinar quién es quién
                     if card.card_id == card_1_id: 
-                        # P1 (Chantajista) dio Blackmailed a P2
                         sender_player = player_one
                         receiver_player = player_two
                     else:
-                        # P2 (Chantajista) dio Blackmailed a P1
                         sender_player = player_two
                         receiver_player = player_one
 
-                    # Ponemos al chantajista (sender) a esperar
+                    # Ponemos al  sender a esperar
                     sender_player.pending_action = "WAITING_FOR_BLACKMAIL" 
-                    # Ponemos al chantajeado (receiver) a elegir un secreto
+                    # Ponemos al receiver a elegir un secreto
                     receiver_player.pending_action = "CHOOSE_BLACKMAIL_SECRET"
-                    break # Salimos del bucle
+                    break 
+                #Ahora comprobamos para el social faux Pas 
+                if card.type == "event" and card.name == "Social Faux Pas" : 
+                    social_faux_paus_detected = True
+                    if card.card_id == card_1_id : 
+                        receiver_player = player_two
+                    else : 
+                        receiver_player = player_one
+                    receiver_player.pending_action = "SocialFauxPas_REVEAL"
+                    break
 
-            # Si no fue blackmail, limpiamos pending actions
-            if not blackmail_detected:
+            # Si no fue blackmail o social faux pas, limpiamos pending actions
+            if not blackmail_detected or not social_faux_paus_detected:
                 if player_one: player_one.pending_action = None
                 if player_two: player_two.pending_action = None
 
             db.delete(trade)
             db.commit() 
             return {"message": "Trade completed"}
-            # --- FIN DEL BLOQUE RE-INDENTADO ---
            
         else:
             # El trade NO está completo
