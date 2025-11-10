@@ -300,20 +300,11 @@ async def ending_point_your_suspicion (game_id : int, db : Session = Depends(get
     await broadcast_game_information(game_id)
     return pys
 
-@events.post("/event/Not_so_fast/{card_id}", status_code=200, tags=["Events"])
-async def activate_cancelable_event(card_id: int, db: Session = Depends(get_db)):
-
-    valid = register_cancelable_event(card_id , db)
-    if valid:
-        await broadcast_last_cancelable_event(card_id)
-    else: 
-        raise HTTPException(status_code=404, detail="You can not play anymore")
     
-@events.get("/events/count/Not_so_fast/{game_id}" , status_code=200 , response_model=Event_Response, tags=["Events"])
+@events.get("/events/count/Not_so_fast/{game_id}" , status_code=200, tags=["Events"])
 def count_NSF(game_id: int , db:Session = Depends(get_db)):
-    NSF_amount = count(game_id , db)
-    return NSF_amount
-
+    
+    return count(game_id , db)
     
 
     
