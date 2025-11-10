@@ -187,7 +187,7 @@ async def early_train_paddington(game_id: int, db: Session):
 
     random.shuffle(deck)
     try:
-        if len(deck) < 6:
+        if game.cards_left< 6:
             await finish_game(game_id)  # se termina el juego si no hay mas cartas en el mazo
             return {"message": "Not enough cards in the deck. The game has ended."}
 
@@ -505,7 +505,6 @@ def select_card_for_folly_trade_service(
         )
 
         if all_selected:
-            # ✅ Todos eligieron → limpiar pending_action y finalizar evento
             for p in players_in_game:
                 p.pending_action = None
 
