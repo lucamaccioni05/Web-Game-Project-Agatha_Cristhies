@@ -106,19 +106,18 @@ def update_social_disgrace(player: Player):
     all_secrets_revealed = (all(s.revelated for s in player.secrets) if player.secrets else False)
 
     player.social_disgrace = accomplice_revealed or all_secrets_revealed
-
 async def check_social_disgrace_win_condition(game_id: int, db: Session):
     """
     Verifica si todos los jugadores, excepto el asesino, están en desgracia social.
-    Si es así, el asesino gana y el juego termina. NO HACE COMMIT.
+    Si es así, el asesino gana y el juego termina.
     """
-    #  Obtener todos los jugadores de la partida
-    players = db.query(Player).filter(Player.game_id == game_id, Player.social_disgrace == True).all()
+    murderer_player = (db.query(Player).join(Secrets).filter(Player.game_id == game_id, Secrets.murderer == True).first())
 
-    if len(players) == db.query(Player).filter(Player.game_id == game_id).count() - 1:
-        # Todos los jugadores excepto uno (asesino) están en desgracia social
+    other_players = (db.query(Player).filter(Player.game_id == game_id, Player.player_id != murderer_player.player_id).all())
+
+    if other_players and all(p.social_disgrace for p in other_players):
         await finish_game(game_id, db)
-        
+
 
 async def reveal_secret(secret_id: int, db: Session):
     secret = db.query(Secrets).filter(Secrets.secret_id == secret_id).first()
@@ -129,22 +128,14 @@ async def reveal_secret(secret_id: int, db: Session):
 
     secret.revelated = True
 
-    if secret.murderer:
-        await finish_game(secret.game_id, db)
-        try:
-            db.commit()
-            db.refresh(secret)
-            return secret
-        except Exception as e:
-            db.rollback()
-            raise HTTPException(status_code=400, detail=f"Error finishing game after revealing murderer: {str(e)}")
-
     player = db.query(Player).filter(Player.player_id == secret.player_id).first()
     if player:
         if player.pending_action == "REVEAL_SECRET":
             player.pending_action = "Clense"
         update_social_disgrace(player)
 
+    if secret.murderer:
+        await finish_game(secret.game_id, db)
 
     game = db.query(Game).filter(Game.game_id == secret.game_id).first()
     if not game:
@@ -154,9 +145,8 @@ async def reveal_secret(secret_id: int, db: Session):
     )
     if player_in_turn and player_in_turn.pending_action == "WAITING_REVEAL_SECRET":
         player_in_turn.pending_action = "Clense"
-    
-    await check_social_disgrace_win_condition(secret.game_id, db)
 
+    await check_social_disgrace_win_condition(secret.game_id, db)
     try:
         db.commit()
         if player:
