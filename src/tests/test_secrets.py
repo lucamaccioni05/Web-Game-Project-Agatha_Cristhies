@@ -168,14 +168,28 @@ async def test_social_disgrace_becomes_true_on_last_secret_reveal(client, setup_
     """Verifies social_disgrace becomes True when a player's last secret is revealed."""
     mocker.patch('src.routes.secrets_routes.broadcast_game_information', new_callable=AsyncMock)
     
-    # Player 1 has secrets 1 (hidden), 2 (revealed), 3 (hidden)
-    # Reveal secret 1
-    client.put("/secrets/reveal/1")
-    # Reveal secret 3
-    client.put("/secrets/reveal/3")
+    # Player 1 has secrets 1 (hidden, murderer), 2 (revealed), 3 (hidden)
+    # We need to reveal the last non-revealed, non-murderer secret.
+    # Secret 2 is already revealed. We reveal secret 3.
+    response = client.put("/secrets/reveal/3")
+    assert response.status_code == 200
 
-    db_session.refresh(db_session.get(Player, 1))
+    # Now all non-murderer secrets are revealed, but the murderer one is not.
+    # Let's check the player state.
     player1 = db_session.get(Player, 1)
+    db_session.refresh(player1)
+    
+    # The logic for social disgrace is that ALL secrets must be revealed.
+    # Since secret 1 (murderer) is still hidden, the player should NOT be in disgrace.
+    assert player1.social_disgrace is False
+
+    # Now, let's reveal the murderer secret, which should trigger disgrace AND end the game.
+    mocker.patch('src.database.services.services_secrets.finish_game', new_callable=AsyncMock)
+    response = client.put("/secrets/reveal/1")
+    assert response.status_code == 200 # The game ends, but the request is successful.
+
+    player1 = db_session.get(Player, 1)
+    db_session.refresh(player1)
     assert player1.social_disgrace is True
 
 @pytest.mark.asyncio

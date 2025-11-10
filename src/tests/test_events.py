@@ -6,7 +6,7 @@ import pytest
 from unittest.mock import patch, AsyncMock
 
 # Import models and schemas needed for setting up test data and requests
-from src.database.models import Game, Player, Event, Secrets, Detective, Card, ActiveTrade
+from src.database.models import Game, Player, Event, Secrets, Detective, Card, ActiveTrade, Log
 from src.schemas.card_schemas import Discard_List_Request
 
 @pytest.fixture
@@ -296,3 +296,154 @@ async def test_end_point_your_suspicion_success(mock_broadcast, client, setup_ev
     game_after = db_session.get(Game, 1)
     assert game_after.status == "in course"
     mock_broadcast.assert_awaited_once_with(1)
+
+# --- NEW EXHAUSTIVE TESTS ---
+
+@pytest.mark.asyncio
+@patch('src.routes.event_routes.broadcast_last_discarted_cards', new_callable=AsyncMock)
+@patch('src.routes.event_routes.broadcast_game_information', new_callable=AsyncMock)
+async def test_cards_off_table_no_nsf_cards(mock_broadcast_game, mock_broadcast_discard, client, setup_events_data, db_session):
+    """Verifies correct behavior when a player has no 'Not so fast' cards."""
+    # Player 2 is created by the fixture without 'Not so fast' cards
+    response = client.put("/event/cards_off_table/2")
+    assert response.status_code == 200
+    assert "No 'Not so fast' cards found" in response.json()["message"]
+    mock_broadcast_game.assert_awaited_once_with(1)
+    mock_broadcast_discard.assert_awaited_once_with(2)
+
+@pytest.mark.asyncio
+async def test_one_more_target_player_not_found(client, setup_events_data):
+    """Verifies error if the target player for the secret does not exist."""
+    response = client.put("/event/one_more/999,1")
+    assert response.status_code == 404
+    assert "New secret Player not found" in response.json()["detail"]
+
+@pytest.mark.asyncio
+async def test_early_train_paddington_game_not_found(client):
+    """Verifies 404 if the game does not exist."""
+    response = client.put("/event/early_train_paddington/999,1")
+    assert response.status_code == 404
+    assert "Game not found" in response.json()["detail"]
+
+@pytest.mark.asyncio
+async def test_early_train_paddington_player_not_in_game(client, setup_events_data):
+    """Verifies 404 if the player is not in the specified game."""
+    response = client.put("/event/early_train_paddington/1,999")
+    assert response.status_code == 404
+    assert "Player not found in this game" in response.json()["detail"]
+
+@pytest.mark.asyncio
+async def test_look_into_ashes_player_not_found(client, setup_events_data):
+    """Verifies 404 if the player does not exist."""
+    response = client.put("/event/look_into_ashes/999,10")
+    assert response.status_code == 404
+    assert "Player not found" in response.json()["detail"]
+
+@pytest.mark.asyncio
+async def test_look_into_ashes_card_not_found(client, setup_events_data):
+    """Verifies 404 if the card is not in the discard pile."""
+    response = client.put("/event/look_into_ashes/2,999")
+    assert response.status_code == 404
+    assert "Card not found" in response.json()["detail"]
+
+@pytest.mark.asyncio
+async def test_delay_escape_no_cards_found(client, setup_events_data):
+    """Verifies 404 if no valid cards are found in the discard pile from the request."""
+    response = client.put("/event/delay_escape/1,1", json={"card_ids": [998, 999]})
+    assert response.status_code == 404
+
+@pytest.mark.asyncio
+async def test_card_trade_initiate_player_not_found(client, setup_events_data):
+    """Verifies 404 if the trader or tradee does not exist."""
+    response_trader = client.post("/event/card_trade/initiate/999,2,2")
+    assert response_trader.status_code == 404
+    response_tradee = client.post("/event/card_trade/initiate/1,999,2")
+    assert response_tradee.status_code == 404
+
+@pytest.mark.asyncio
+async def test_card_trade_select_card_no_active_trade(client, setup_events_data):
+    """Verifies error when selecting a card without an active trade."""
+    response = client.post("/event/card_trade/select_card/1/3")
+    assert response.status_code == 400
+    assert "No es una acción válida para este jugador." in response.json()["detail"]
+
+@pytest.mark.asyncio
+async def test_card_trade_select_card_twice(client, setup_events_data):
+    """Verifies error when a player tries to select a card twice."""
+    client.post("/event/card_trade/initiate/1,2,2")
+    client.post("/event/card_trade/select_card/1/3")
+    
+    response = client.post("/event/card_trade/select_card/1/3")
+    assert response.status_code == 400
+    assert "Carta ya seleccionada" in response.json()["detail"]
+
+@pytest.mark.asyncio
+async def test_dead_card_folly_initiate_invalid_direction(client, setup_events_data):
+    """Verifies error on initiating folly with an invalid direction."""
+    response = client.post("/event/dead_card_folly/initiate/1/1/5/up")
+    assert response.status_code == 400
+    assert "Dirección inválida" in response.json()["detail"]
+
+@pytest.mark.asyncio
+async def test_dead_card_folly_select_card_not_owned(client, setup_events_data):
+    """Verifies error if a player tries to pass a card they don't own."""
+    client.post("/event/dead_card_folly/initiate/1/1/5/right")
+    # Player 1 (from_player_id=1) tries to pass Player 2's card (card_id=4)
+    response = client.post("/event/dead_card_folly/select_card/1/2/4")
+    assert response.status_code == 404
+    assert "no pertenece al jugador origen" in response.json()["detail"]
+
+@pytest.mark.asyncio
+async def test_point_your_suspicion_game_not_found(client):
+    """Verifies 404 if game is not found for 'Point your suspicion'."""
+    response = client.put("/event/point_your_suspicion/999")
+    assert response.status_code == 404
+
+@pytest.mark.asyncio
+async def test_end_point_your_suspicion_game_not_found(client):
+    """Verifies 404 if game is not found for ending 'Point your suspicion'."""
+    response = client.put("/event/end/point_your_suspicion/999")
+    assert response.status_code == 404
+
+@pytest.mark.asyncio
+async def test_point_your_suspicion_no_players_in_game(client, db_session):
+    """Verifies error if 'Point your suspicion' is called on a game with no players."""
+    game = Game(
+        game_id=99, 
+        name="Empty Game", 
+        status="in course",
+        max_players=4,      # <-- AÑADIR
+        min_players=2,      # <-- AÑADIR
+        players_amount=0    # <-- AÑADIR
+    )
+    db_session.add(game)
+    db_session.commit()
+    response = client.put("/event/point_your_suspicion/99")
+    assert response.status_code == 404
+    assert "Players not found" in response.json()["detail"]
+
+def test_count_nsf_success(client, setup_events_data, db_session):
+    """Verifies the count of 'Not so fast' cards for a cancelable event."""
+    game = db_session.get(Game, 1)
+    player = db_session.get(Player, 1)
+    
+    # Log a cancelable event (Card Trade, card_id=2)
+    log_entry = Log(game_id=game.game_id, player_id=player.player_id, card_id=2)
+    db_session.add(log_entry)
+    db_session.commit()
+
+    response = client.get(f"/events/count/Not_so_fast/{game.game_id}")
+    assert response.status_code == 200
+    # Since there are no NSF cards played, the original event should be returned
+    assert response.json()["name"] == "Card trade"
+
+def test_count_nsf_game_not_found(client):
+    """Verifies 404 if game is not found for counting NSF."""
+    response = client.get("/events/count/Not_so_fast/999")
+    assert response.status_code == 404
+
+def test_count_nsf_no_logs(client, setup_events_data):
+    """Verifies 404 if there are no logs for the game."""
+    response = client.get(f"/events/count/Not_so_fast/1")
+    assert response.status_code == 404
+    assert "There are no events to count" in response.json()["detail"]
