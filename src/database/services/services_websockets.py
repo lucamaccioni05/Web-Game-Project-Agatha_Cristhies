@@ -194,3 +194,36 @@ async def broadcast_card_draft(game_id: int):
         )
     finally:
         db.close()
+
+async def broadcast_last_cancelable_event(card_id : int):
+    db = SessionLocal()
+    try:
+        polymorphic_loader = orm.with_polymorphic(Card, [Detective, Event])
+        stmt = select(polymorphic_loader).where(Card.card_id == card_id)
+        card = db.execute(stmt).scalar_one_or_none()
+
+        if not card:
+            raise HTTPException(status_code=404, detail="Card not found")
+
+        game_id = card.game_id
+
+        card_adapter = TypeAdapter(AllCardsResponse)
+        card_response = card_adapter.validate_python(card, from_attributes=True)
+
+        card_json = jsonable_encoder(card_response)
+
+        await gameManager.broadcast(json.dumps({
+            "type": "cardResponse",
+            "data": card_json
+        }), game_id)
+
+    finally:
+        db.close()   
+ 
+
+
+
+
+
+         
+    

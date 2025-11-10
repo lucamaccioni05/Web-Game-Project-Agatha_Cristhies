@@ -10,8 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 
 app = FastAPI(
-    title = "Agatha Christie's Death on the Cards API ",
-    description = "API to connect with server for the respective game"
+    title="Agatha Christie's Death on the Cards API ",
+    description="API to connect with server for the respective game",
 )
 
 app.add_middleware(
@@ -23,19 +23,15 @@ app.add_middleware(
 )
 
 
-
-
 @app.get("/")
-def hola() :
+def hola():
     return "Hola Mundo"
 
-app.include_router(ws) 
+
+app.include_router(ws)
 app.include_router(player)
 app.include_router(game)
 app.include_router(card)
 app.include_router(secret)
 app.include_router(set)
 app.include_router(events)
-
-
-
