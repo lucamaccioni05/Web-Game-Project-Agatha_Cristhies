@@ -33,6 +33,8 @@ from src.database.services.services_events import (
     select_card_for_trade_service,
     initiate_dead_card_folly,
     select_card_for_folly_trade_service,
+    point_your_suspicion, 
+    end_point_your_suspicion
 )
 import random
 
@@ -285,8 +287,18 @@ async def activate_dead_card_folly_trade_select_card(
         await broadcast_game_information(from_player.game_id)
 
     return result
-        
-    return result
+    
+@events.put ("/event/point_your_suspicion/{game_id}", status_code = 200,tags = ["Events"])
+async def activate_point_your_suspicion (game_id : int, db : Session = Depends(get_db)) :
+    pys = point_your_suspicion(game_id, db)
+    await broadcast_game_information(game_id)
+    return pys 
+
+@events.put ("/event/end/point_your_suspicion/{game_id}", status_code = 200,tags = ["Events"])
+async def ending_point_your_suspicion (game_id : int, db : Session = Depends(get_db)) :
+    pys = end_point_your_suspicion(game_id, db)
+    await broadcast_game_information(game_id)
+    return pys
 
 @events.post("/event/Not_so_fast/{card_id}", status_code=200, tags=["Events"])
 async def activate_cancelable_event(card_id: int, db: Session = Depends(get_db)):

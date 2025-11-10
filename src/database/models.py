@@ -27,9 +27,10 @@ class Game(Base):
     )  # 'esperando jugadores', 'en curso', 'finalizada'
     max_players = Column(Integer, nullable=False)
     min_players = Column(Integer, nullable=False)
-    players_amount = Column(Integer, nullable=False)
-    current_turn = Column(Integer, nullable=True)
-    cards_left = Column(Integer, nullable=True)
+    players_amount = Column(Integer,nullable = False)
+    current_turn = Column(Integer, nullable = True)
+    cards_left = Column(Integer , nullable=True)
+    amount_votes = Column (Integer, default = 0)
     players = relationship("Player", back_populates="game")
     cards = relationship("Card", back_populates="game")
     secrets = relationship("Secrets", back_populates="game")

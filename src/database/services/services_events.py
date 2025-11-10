@@ -22,6 +22,40 @@ from typing import List
 # Estructura: {game_id: {player_id: card_id}}
 folly_selections = {}
 
+def point_your_suspicion(game_id: int, db: Session = Depends(get_db)):
+    game = db.query(Game).filter(Game.game_id == game_id).first()
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    players = db.query(Player).filter(Player.game_id == game_id).all()
+    if not players : 
+        raise HTTPException(status_code=404, detail="Players not found.")
+    try:
+        for player in players : 
+            player.pending_action = "VOTE"
+        db.commit()
+        return {"message": "Point your Suspicion event executed successfully."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Error executing 'Point Your Suspicion' event: {str(e)}",
+        )
+
+def end_point_your_suspicion(game_id: int, db: Session = Depends(get_db)):
+    game = db.query(Game).filter(Game.game_id == game_id).first()
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    game.status = "in course"
+    try:
+        db.commit()
+        return {"message": "Point your Suspicion ending event executed successfully."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Error executing 'Point Your Suspicion' ending event: {str(e)}",
+        )
+
 
 def cards_off_table(player_id: int, db: Session):
     """
