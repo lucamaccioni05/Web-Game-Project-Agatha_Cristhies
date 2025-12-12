@@ -1,0 +1,213 @@
+from fastapi import APIRouter, Depends, HTTPException
+ # te permite definir las rutas o subrutas por separado
+from sqlalchemy.orm import Session
+from src.database.database import SessionLocal, get_db
+from src.database.models import Secrets, Player, Game
+import random
+
+from src.database.services.services_games import finish_game
+
+
+def deal_secrets_to_players(game_id: int, db: Session):
+    """
+    Reparte 3 secretos aleatorios a cada jugador, reintentando si el Asesino y
+    el Cómplice son el mismo jugador.
+    """
+    players = db.query(Player).filter(Player.game_id == game_id).all()
+    secrets_deck = (db.query(Secrets).filter(Secrets.game_id == game_id, Secrets.player_id.is_(None)).all())
+    if not players:
+        raise HTTPException(status_code=404, detail="No players found for the given game_id")
+    if not secrets_deck:
+        raise HTTPException(status_code=404, detail="No secrets available to deal for the given game_id" )
+
+    while True:
+        # 1. Barajar las cartas en cada intento
+        random.shuffle(secrets_deck)
+
+        # 2. Asignar 3 secretos a cada jugador
+        secret_cursor = 0
+        for player in players:
+            for _ in range(3):
+                secret_to_deal = secrets_deck[secret_cursor]
+                secret_to_deal.player_id = player.player_id
+                secret_cursor += 1
+
+        # 3. Comprobar la condición
+        murderer_card = next((s for s in secrets_deck if s.murderer), None)
+        acomplice_card = next((s for s in secrets_deck if s.acomplice), None)
+
+        # Si no hay cómplice o si los dueños son diferentes, la repartición es válida
+        if not acomplice_card or (acomplice_card.player_id != murderer_card.player_id):
+            break  # Salir del bucle while
+
+        # Si la condición no se cumple, el bucle se repetirá, volviendo a barajar y asignar.
+
+    try:
+        # 4. Confirmar los cambios en la base de datos una vez que la repartición es válida
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500,detail=f"Ocurrió un error al repartir los secretos: {str(e)}",)
+
+    return {"message": f"Se repartieron 3 secretos a {len(players)} jugadores en la partida {game_id}."}
+
+
+def init_secrets(game_id: int, db: Session = Depends(get_db)):
+    new_secret_list = []
+    players = db.query(Player).filter(Player.game_id == game_id).all()
+    num_players = len(players)
+
+    cards_to_create = num_players * 3 - 1  # una carta es la del asesino
+    # Cada jugador recibe 3 secretos, por lo que se crean 3 * número de jugadores
+    if num_players > 4:
+        cards_to_create = (cards_to_create - 1)  # si hay mas de 4 jugadores un secreto va a ser el del complice
+        acomplice_card = Secrets(murderer=False, acomplice=True, revelated=False, player_id=None, game_id=game_id)
+        new_secret_list.append(acomplice_card)
+    #
+    murderer_card = Secrets(murderer=True, acomplice=False, revelated=False, player_id=None, game_id=game_id)
+    new_secret_list.append(murderer_card)
+
+    for _ in range(cards_to_create):
+        new_secret = Secrets(
+            murderer=False,
+            acomplice=False,
+            revelated=False,
+            player_id=None,
+            game_id=game_id,
+        )
+        new_secret_list.append(new_secret)
+
+    try:
+        db.add_all(new_secret_list)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error creating cards: {str(e)}")
+
+    return {"message": f"{len(new_secret_list)} secrets created successfully"}
+
+
+def update_social_disgrace(player: Player):
+    """
+    Verifica si un jugador debe estar en desgracia social. NO HACE COMMIT.
+    Reglas:
+    - Si un jugador revela su secreto de 'Cómplice', entra en desgracia.
+    - Si un jugador tiene todos sus secretos revelados, entra en desgracia.
+    - Si un jugador estaba en desgracia y se queda sin secretos, permanece en desgracia.
+    """
+    if not player:
+        return
+
+    # Si ya está en desgracia y se queda sin secretos, permanece en desgracia.
+    if player.social_disgrace and not player.secrets:
+        return
+
+    accomplice_revealed = any(s.revelated and s.acomplice for s in player.secrets)
+    all_secrets_revealed = (all(s.revelated for s in player.secrets) if player.secrets else False)
+
+    player.social_disgrace = accomplice_revealed or all_secrets_revealed
+async def check_social_disgrace_win_condition(game_id: int, db: Session):
+    """
+    Verifica si todos los jugadores, excepto el asesino, están en desgracia social.
+    Si es así, el asesino gana y el juego termina.
+    """
+    murderer_player = (db.query(Player).join(Secrets).filter(Player.game_id == game_id, Secrets.murderer == True).first())
+
+    other_players = (db.query(Player).filter(Player.game_id == game_id, Player.player_id != murderer_player.player_id).all())
+
+    if other_players and all(p.social_disgrace for p in other_players):
+        await finish_game(game_id, db)
+
+
+async def reveal_secret(secret_id: int, db: Session):
+    secret = db.query(Secrets).filter(Secrets.secret_id == secret_id).first()
+    if not secret:
+        raise HTTPException(status_code=404, detail="Secret not found")
+    if secret.revelated:
+        raise HTTPException(status_code=400, detail="Secret is already revealed")
+
+    secret.revelated = True
+
+    player = db.query(Player).filter(Player.player_id == secret.player_id).first()
+    if player:
+        if player.pending_action == "REVEAL_SECRET":
+            player.pending_action = "Clense"
+        update_social_disgrace(player)
+
+    if secret.murderer:
+        await finish_game(secret.game_id, db)
+
+    game = db.query(Game).filter(Game.game_id == secret.game_id).first()
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    player_in_turn = (
+        db.query(Player).filter(Player.player_id == game.current_turn).first()
+    )
+    if player_in_turn and player_in_turn.pending_action == "WAITING_REVEAL_SECRET":
+        player_in_turn.pending_action = "Clense"
+
+    await check_social_disgrace_win_condition(secret.game_id, db)
+    try:
+        db.commit()
+        if player:
+            db.refresh(player)
+        db.refresh(secret)
+        return secret
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error revealing secret: {str(e)}")
+
+
+def hide_secret(secret_id: int, db: Session):
+    secret = db.query(Secrets).filter(Secrets.secret_id == secret_id).first()
+    if not secret:
+        raise HTTPException(status_code=404, detail="Secret not found")
+    if not secret.revelated:
+        raise HTTPException(status_code=400, detail="Secret is not revealed")
+
+    secret.revelated = False
+
+    player = db.query(Player).filter(Player.player_id == secret.player_id).first()
+    if player:
+        update_social_disgrace(player)
+
+    try:
+        db.commit()
+        if player:
+            db.refresh(player)
+        db.refresh(secret)
+        return secret
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error hiding secret: {str(e)}")
+
+
+def steal_secret(target_player_id: int, secret_id: int, db: Session):
+    secret = db.query(Secrets).filter(Secrets.secret_id == secret_id).first()
+    if not secret:
+        raise HTTPException(status_code=404, detail="Secret not found")
+    if not secret.revelated:
+        raise HTTPException(status_code=400, detail="Secret must be revealed to be stolen")
+
+    new_owner = db.query(Player).filter(Player.player_id == target_player_id).first()
+
+    if not new_owner:
+        raise HTTPException(status_code=404, detail="Player not found")
+
+    # 1. Cambiar el estado del secreto
+    secret.player_id = new_owner.player_id
+    secret.revelated = False
+
+    # 2. Actualizar el estado de desgracia de ambos jugadores (con la información ya actualizada)
+    update_social_disgrace(new_owner)
+
+    # 3. Hacer commit de todos los cambios a la vez
+    try:
+        db.commit()
+        # Refrescar todos los objetos modificados para que la sesión los tenga actualizados
+        db.refresh(new_owner)
+        db.refresh(secret)
+        return secret
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Error stealing secret: {str(e)}")
