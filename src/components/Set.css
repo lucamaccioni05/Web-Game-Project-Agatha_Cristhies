@@ -1,0 +1,47 @@
+.set {
+  display: flex;
+  gap: 0;
+  justify-items: center;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 12px;
+  z-index: 50;
+}
+
+.set .card {
+  transition: all 0.3s ease-in-out;
+  z-index: 1;
+}
+
+.set.table::hover {
+  transform: translateY(-20px);
+  box-shadow: 0px 0px 15px rgba(90, 0, 0, 0.9);
+}
+
+.set.table .card {
+  margin-left: -20px;
+}
+
+.set.table .card:first-child {
+  margin-left: 0;
+}
+
+/* .set.selected {
+  position: absolute;
+  margin-left: initial !important;
+  margin-right: initial !important;
+  gap: 5px;
+  cursor: pointer;
+  &.selected {
+    transform: translateY(-20px);
+  }
+
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 45px;
+  z-index: 100;
+}
+
+.set.selected .card:last-child {
+  margin-right: 0;
+} */

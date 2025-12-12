@@ -1,0 +1,40 @@
+.card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* border: 2px solid black; */
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: white;
+  object-fit: cover;
+  box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.8);
+}
+
+.card-selected {
+  outline: 2px solid rgb(98, 22, 15);
+  transform: translateY(-10px);
+  transition: all 0.2s ease;
+}
+
+/* Imagen dentro de la carta */
+.card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Tamaños ratio 2/3 */
+.card-mini {
+  width: 4rem;
+  height: 6rem;
+}
+
+.card-medium {
+  width: 7rem;
+  height: 10.5rem;
+}
+
+.card-large {
+  width: 16rem;
+  height: 24rem;
+}

@@ -1,0 +1,105 @@
+.draft-pile-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.draft-pile-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  gap: 8px;
+}
+
+.draft-pile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  transition: all 0.3s ease-in-out;
+}
+
+.draft-pile-container.expanded-mode {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 120;
+  padding: 2rem;
+  border-radius: 12px;
+  /* Fondo temático, no negro */
+  background-color: rgba(40, 0, 0, 0.8);
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.draft-pile.expanded {
+  gap: 20px;
+}
+
+.draft-placeholder {
+  border-radius: 8px;
+  background-color: transparent;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+}
+.draft-placeholder.medium {
+  width: 80px;
+  height: 120px;
+}
+.draft-placeholder.large {
+  width: 120px;
+  height: 180px;
+}
+
+.draft-card-container.clickable {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.draft-card-container.clickable:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
+
+.draft-card-container.selected .card {
+  outline: 4px solid #ffd700;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.7);
+}
+
+.draft-card-container.selected {
+  transform: translateY(-5px);
+}
+
+.draft-pile-container.expanded-mode .draft-controls-row {
+  position: absolute;
+  left: -180px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.draft-controls-row {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.draft-pile-wrapper .custom-button {
+  background-color: transparent;
+  border: 3px solid #fff;
+  color: #fff;
+  padding: 0.8rem 1.4rem;
+  font-size: 1rem;
+  font-weight: 700;
+  border-radius: 10px;
+  box-shadow: 0 0px 15px rgba(0, 0, 0, 0.3);
+}
+
+.draft-pile-wrapper .custom-button:hover {
+  transform: translateY(-2px);
+  opacity: 0.95;
+  background-color: rgba(92, 1, 1, 0.856);
+  box-shadow: 0 0px 15px rgba(0, 0, 0, 0.9);
+}

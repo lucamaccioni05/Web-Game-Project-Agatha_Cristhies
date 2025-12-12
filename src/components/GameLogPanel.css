@@ -1,0 +1,50 @@
+.game-log-panel-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  /* Estilos del panel */
+  background-color: rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.log-window {
+  flex: 1; /* Ocupa todo el espacio, empujando las acciones hacia abajo */
+  overflow-y: auto; /* Scroll SÓLO del log */
+  padding: 16px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+
+  /* Efecto de "fade" para que el scroll se vea mejor */
+  mask-image: linear-gradient(to bottom, black 95%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 95%, transparent 100%);
+}
+
+.log-window h3 {
+  margin-top: 0;
+  border-bottom: 1px solid #fff3;
+  padding-bottom: 8px;
+  font-size: 1.2rem;
+  color: #eee;
+  font-weight: 600;
+  text-align: center;
+}
+
+.log-list .log-message {
+  margin: 4px 0;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: #ccc;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.action-window {
+  flex-shrink: 0; /* No se encoge */
+  padding: 20px; /* Espacio interno para los botones */
+  background-color: rgba(0, 0, 0, 0.2);
+  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.2) inset;
+}

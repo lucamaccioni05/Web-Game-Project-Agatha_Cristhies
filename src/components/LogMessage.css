@@ -1,0 +1,15 @@
+.log-message {
+  margin: 4px 0 !important; /* Sobreescribe cualquier margen de <p> */
+  padding: 8px 12px !important;
+  font-size: 0.9rem !important;
+  line-height: 1.4 !important;
+  color: #ccc !important;
+  background-color: rgba(0, 0, 0, 0.2) !important;
+  border-radius: 4px !important;
+  text-align: left !important; /* Asegura que el texto esté alineado a la izquierda */
+  font-weight: 400 !important;
+}
+
+.log-message:nth-child(odd) {
+  background-color: rgba(0, 0, 0, 0.3) !important;
+}

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Palette -->
+  <!-- Negro #111, Crema #E9DCC4, Rojo #B6432E, Marrón #6B4A2E -->
+
+  <!-- Sombra/contorno exterior del aro -->
+  <circle cx="104" cy="104" r="64" fill="#111"/>
+  <!-- Anillo crema -->
+  <circle cx="104" cy="104" r="55" fill="#E9DCC4"/>
+  <!-- Anillo interior negro fino -->
+  <circle cx="104" cy="104" r="46" fill="#111"/>
+  <!-- Lente roja -->
+  <circle cx="104" cy="104" r="38" fill="#B6432E"/>
+  <!-- Brillo de lente (forma retro) -->
+  <path d="M122 88c-10-8-28-8-38 0 6-12 26-16 38 0z" fill="#E9DCC4" opacity="0.9"/>
+
+  <!-- Mango (ligeramente diagonal) -->
+  <g transform="rotate(35 152 152)">
+    <!-- cuerpo negro -->
+    <rect x="148" y="148" width="86" height="20" rx="10" fill="#111"/>
+    <!-- inserto marrón -->
+    <rect x="154" y="152" width="74" height="12" rx="6" fill="#6B4A2E"/>
+    <!-- anillo crema de unión -->
+    <rect x="140" y="144" width="16" height="28" rx="8" fill="#E9DCC4" stroke="#111" stroke-width="3"/>
+    <!-- tapa roja del mango -->
+    <path d="M234 158a18 18 0 0 1-18 18h-8v-36h8a18 18 0 0 1 18 18z" fill="#B6432E" stroke="#111" stroke-width="3"/>
+  </g>
+
+  <!-- Bisel negro fino alrededor del aro (toque Art Deco) -->
+  <circle cx="104" cy="104" r="64" fill="none" stroke="#111" stroke-width="4"/>
+</svg>

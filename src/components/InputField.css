@@ -1,0 +1,60 @@
+.input-field {
+  background-color: transparent;
+  /* ELIMINADO: color: #2a1713; <--- ESTO ES LO QUE HACÍA EL TEXTO OSCURO */
+  border: 2px solid #2a1713a0;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 100%;
+  padding: 0.7rem;
+  transition: all 0.3s ease;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: #2a1713;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.input-field.input-error {
+  border: 2px solid red;
+  background: linear-gradient(
+    320deg,
+    rgba(255, 255, 255, 0.856) 8%,
+    rgba(228, 15, 15, 0.596) 86%
+  );
+  box-shadow: 0 0 6px rgba(255, 0, 0, 0.6);
+  animation: pulseBorder 1s infinite ease-in-out;
+}
+
+/* Estas reglas ya fuerzan el color a blanco en error, lo cual está bien */
+.input-field.input-error::placeholder {
+  color: white;
+  opacity: 1;
+}
+
+.input-field.input-error[type="date"] {
+  color: white;
+}
+
+.input-field.input-error[type="number"] {
+  color: white;
+}
+
+@keyframes pulseBorder {
+  0% {
+    border-color: rgba(255, 0, 0, 0.8);
+    box-shadow: 0 0 5px rgba(255, 0, 0, 0.4);
+  }
+  50% {
+    border-color: rgba(255, 0, 0, 1);
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
+  }
+  100% {
+    border-color: rgba(255, 0, 0, 0.8);
+    box-shadow: 0 0 5px rgba(255, 0, 0, 0.4);
+  }
+}
+.input-field::placeholder {
+  color: rgb(93, 93, 93);
+  opacity: 1;
+}

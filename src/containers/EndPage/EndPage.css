@@ -1,0 +1,146 @@
+.end-page {
+  position: relative;
+  height: 100dvh;
+  width: 100vw;
+  overflow-y: auto;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  font-family: "Poppins", sans-serif;
+  color: white;
+
+  z-index: 1;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+.end-page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+
+  background: url("../../assets/background.png") center/cover no-repeat;
+  filter: brightness(0.9);
+
+  z-index: -2;
+}
+
+.end-page h1 {
+  text-align: center;
+  color: white;
+  font-family: "Poppins", sans-serif;
+  font-size: 4rem;
+  font-weight: 800;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.9),
+    0 0 16px rgba(255, 255, 255, 0.7), 0 0 24px rgba(255, 255, 255, 0.5);
+  margin: 0;
+  margin-bottom: 0.5rem;
+  padding: 1rem;
+}
+
+.winner-message {
+  font-size: 2.5rem;
+  margin: 0;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+  font-family: "Poppins", sans-serif;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+}
+.winner-message.win {
+  color: #76ff03;
+}
+.winner-message.lose {
+  color: #ff5252;
+}
+
+.result-summary {
+  font-size: 1.5rem;
+  color: #f0f0f0;
+  margin-bottom: 3rem;
+  font-weight: 400;
+  font-family: "Poppins", sans-serif;
+  text-align: center;
+}
+.player-list {
+  background-color: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
+
+.player-list h3 {
+  font-family: "Poppins", sans-serif;
+  margin-top: 0;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.8);
+  padding-bottom: 0.5rem;
+  color: #ffffff;
+}
+
+.player-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.player-list li {
+  font-family: "Poppins", sans-serif;
+  font-size: 1.1rem;
+  padding: 0.75rem 0.5rem;
+  border-bottom: 1px solid #555;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.player-list li:last-child {
+  border-bottom: none;
+}
+
+.player-list .player-name {
+  font-weight: bold;
+  color: #f0f0f0;
+}
+
+.player-list .player-role {
+  font-weight: bold;
+}
+
+.player-list .role-asesino {
+  color: #ff5252;
+}
+
+.player-list .role-cómplice {
+  color: #ff8a80;
+}
+
+.player-list .role-ciudadano {
+  color: #76ff03;
+}
+
+.lobby-button {
+  background: #1a1a1a;
+  color: #fff;
+  border: 1px solid #fff;
+  padding: 0.8rem 1.5rem;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  font-family: "Poppins", sans-serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-top: 1rem;
+  transition: all 0.2s ease-in-out;
+}
+.lobby-button:hover {
+  opacity: 0.95;
+  background: #000;
+  transform: translateY(-2px);
+}

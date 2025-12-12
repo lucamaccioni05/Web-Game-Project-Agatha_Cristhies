@@ -1,0 +1,36 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: #3a2a1c;
+  padding: 20px;
+  border-radius: 8px;
+  border: 2px solid #c8b08a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+}
+
+.modal-content h3 {
+  color: #f0e6d2;
+  margin: 0;
+  text-align: center;
+  font-family: "Helvetica Neue", sans-serif; /* O la fuente de tu app */
+}
+
+.modal-secret-container {
+  transform: scale(1.2); /* Hace el secreto un poco más grande */
+  margin: 15px 0;
+}

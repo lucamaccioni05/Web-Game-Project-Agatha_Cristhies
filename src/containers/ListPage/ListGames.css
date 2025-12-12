@@ -1,0 +1,157 @@
+.list-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  width: 100vw;
+  background: url("../../assets/background.png") center/cover no-repeat;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  font-family: "Poppins";
+}
+
+.list-container {
+  width: 35%;
+  height: 80%;
+  min-width: 550px;
+
+  background-color: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(10px);
+
+  padding: 2%;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  box-shadow: 0rem 0rem 1rem 0.2rem rgba(41, 3, 3, 0.5);
+  box-sizing: border-box;
+  overflow-y: auto;
+  padding-top: 0.2rem;
+}
+
+.container-title {
+  margin-top: 2.5rem;
+  font-size: clamp(2rem, 4vw, 2.5rem);
+  font-weight: 500;
+  text-align: center;
+  color: #f0f0f0;
+  flex-shrink: 0;
+  margin-bottom: 0rem;
+}
+
+.game-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  margin: 0.4rem;
+  padding-left: 0;
+}
+
+.list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0.3rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 1rem 0.5rem;
+}
+
+.list-item .custom-button {
+  background-color: #222;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid #e0e0e0;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.list-item .custom-button:hover {
+  background-color: #6b0000;
+  border-color: #ffffff;
+  transform: translateY(-2px);
+}
+/* --- FIN ARREGLO --- */
+
+.list-item .custom-button:disabled {
+  background-color: #444;
+  color: #888;
+  border-color: #555;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.list-item:last-child {
+  border-bottom: none;
+}
+
+.side-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1;
+}
+
+.item-title {
+  font-size: clamp(1.2rem, 2.3vw, 1.5rem);
+  font-weight: 700;
+  color: #e0e0e0;
+  margin-left: 0.1rem;
+}
+
+.item-data {
+  font-size: clamp(1rem, 2vw, 1.3rem);
+  font-weight: 500;
+  color: #c0c0c0;
+  margin-left: 0.1rem;
+}
+
+.list-container .custom-button {
+  padding: 0.8rem 1.2rem;
+  font-size: 0.9rem;
+  border-radius: 8px;
+  min-width: 100px;
+  margin-left: 1rem;
+  margin-right: 0.5rem;
+}
+
+.status-message {
+  font-weight: bold;
+}
+
+.status-message.waiting-players,
+.status-message.bootable,
+.status-message.Full {
+  color: #76ff03;
+}
+
+.status-message.in-course {
+  color: #ff9800;
+}
+.status-message.finished {
+  color: #ff5252;
+}
+
+@media (max-width: 600px) {
+  .list-container {
+    width: 90vw;
+    min-width: 0;
+    height: 80vh;
+  }
+
+  .list-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .list-container .custom-button {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+}

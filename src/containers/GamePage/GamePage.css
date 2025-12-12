@@ -1,0 +1,162 @@
+.game-page {
+  height: 100dvh;
+  width: 100vw;
+  overflow-y: hidden;
+}
+
+.game-board-layout {
+  display: grid;
+  /* cambiar 4fr para modificar ancho*/
+  grid-template-columns: 4fr 1fr;
+  width: 100%;
+  height: 100%; /* Ocupa toda la altura */
+  gap: 16px; /* Un espacio entre el tablero y el log */
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.game-log-panel {
+  background-color: rgba(0, 0, 0, 0.3);
+  border-left: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 16px;
+
+  height: 100%;
+  box-sizing: border-box;
+
+  overflow: hidden;
+}
+
+.game-log-panel h3 {
+  margin-top: 0;
+  border-bottom: 1px solid #fff3;
+  padding-bottom: 8px;
+}
+
+.game-page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: url("../../assets/background.png") center/cover no-repeat;
+  filter: brightness(0.9);
+  z-index: -2;
+}
+
+.host-start-button {
+  background: #1a1a1a;
+  color: #fff;
+  border: none;
+  padding: 0.5rem 0.9rem;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+.host-start-button:hover {
+  opacity: 0.95;
+}
+
+/* ====== Layout de mesa (grid por áreas) ====== */
+
+.table-grid {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  max-height: 100dvh; /* en lugar de min-height */
+  padding: 70px 16px 16px;
+  display: grid;
+  grid-template-rows: auto auto 1fr; /* TOP | MIDDLE | BOTTOM */
+  grid-template-columns: 1fr;
+  gap: 12px;
+  overflow: hidden;
+  box-sizing: border-box; /* asegura que padding cuente dentro del 100vh */
+  overflow-y: auto; /* por si algo se sale */
+  align-items: center;
+}
+
+/* TOP: fila con hasta 3 oponentes */
+.area-top {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+.opponents-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 16px;
+  max-width: min(1100px, 92vw);
+  align-items: center;
+}
+
+.area-center {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-items: center;
+  gap: 24px;
+}
+
+.area-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+@media (min-width: 900px) {
+  .table-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto; /* T | M | B */
+    gap: 16px;
+  }
+
+  .area-center {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+}
+
+p {
+  font-family: "Poppins";
+  text-align: center;
+  color: white;
+}
+
+h1 {
+  text-align: center;
+  color: white;
+}
+
+.game-page.end-screen {
+  height: 100dvh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.game-page.end-screen h1 {
+  color: white;
+  text-align: center;
+  font-family: "Poppins", sans-serif;
+  font-size: 4rem;
+  font-weight: 800;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.9),
+    0 0 16px rgba(255, 255, 255, 0.7), 0 0 24px rgba(255, 255, 255, 0.5);
+  margin: 0;
+  margin-top: 1rem;
+  padding: 1rem;
+}
+
+.turn-actions-container {
+  /* Le dice que CREZCA y ocupe el espacio 
+     que NO usa la mano del jugador (<You>) */
+  flex-grow: 1;
+
+  /* Le da una altura mínima por si acaso */
+  /* min-height: 350px; */
+
+  width: 100%;
+  max-width: 450px; /* (Opcional) Limita el ancho */
+
+  /* Hack para que el flex-grow funcione bien con el 100% de los hijos */
+  /* height: 0; */
+}

@@ -1,0 +1,179 @@
+.home-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  width: 100vw;
+  background: url("../../assets/background.png") center/cover no-repeat;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  font-family: "Poppins";
+}
+
+.form-container {
+  width: 35%;
+  height: 50%;
+  min-width: 550px;
+  background-color: rgba(0, 0, 0, 0.6);
+  padding: 2%;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-shadow: 0rem 0rem 1rem 0.2rem rgba(41, 3, 3, 0.5);
+  box-sizing: border-box;
+  backdrop-filter: blur(10px);
+}
+
+.double-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.double-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.form-title {
+  font-size: clamp(3rem, 2vw, 1.5rem);
+  font-weight: 500;
+  text-align: center;
+  color: #f0f0f0;
+  margin-bottom: 1rem;
+}
+
+.form-field {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  margin: 0.5rem 0;
+}
+
+.form-label {
+  font-size: clamp(1.1rem, 1.2vw, 1rem);
+  font-weight: 500;
+  color: #e0e0e0;
+  margin-left: 0.1rem;
+  margin-bottom: 0.2rem;
+}
+
+.error-message {
+  font-size: 1.1rem;
+  text-align: center;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  white-space: normal;
+  line-height: 1.3rem;
+  visibility: hidden;
+  padding: 0;
+  min-height: 2rem;
+  max-height: 4rem;
+  overflow-wrap: break-word;
+  color: #ff5252;
+}
+
+.error-message.active {
+  visibility: visible;
+}
+
+.form-buttons {
+  width: 100%;
+  margin-top: 1.5rem;
+  margin-bottom: 0rem;
+  padding: clamp(0.4rem, 1vw, 0.8rem) clamp(0.8rem, 2vw, 1.2rem);
+  font-size: clamp(0.7rem, 1vw, 1rem);
+  display: inline-flex;
+  gap: 1.2rem;
+}
+
+.form-button .custom-button {
+  flex: 1;
+  padding: 0.8rem;
+  font-size: clamp(0.9rem, 1vw, 1.1rem);
+  border-radius: 6px;
+  background-color: #222;
+  color: #ffffff;
+  border: 1px solid #e0e0e0;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.form-button .custom-button:hover {
+  background-color: #000;
+  border-color: #ffffff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  transform: translateY(-2px);
+}
+
+.form-field input[type="text"],
+.form-field input[type="date"],
+.form-field select {
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  padding: 0.6rem 0.8rem;
+  border-radius: 4px;
+  font-family: "Poppins";
+  font-size: clamp(1rem, 1.1vw, 0.9rem);
+}
+
+.form-field input[type="text"]::placeholder,
+.form-field input[type="date"]::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.form-field input[type="text"]:focus,
+.form-field input[type="date"]:focus,
+.form-field select:focus {
+  outline: none;
+  border-color: #f0f0f0;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+.form-field select option {
+  background-color: #222;
+  color: #ffffff;
+}
+
+@media (max-width: 600px) {
+  .form-container {
+    width: 90%;
+    min-width: 0;
+    height: auto;
+    padding: 1.5rem;
+  }
+
+  .form-title {
+    font-size: 2.5rem;
+  }
+
+  .double-container {
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .double-field {
+    width: 100%;
+  }
+
+  .form-buttons {
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0;
+  }
+
+  .form-button .custom-button {
+    width: 100%;
+  }
+}

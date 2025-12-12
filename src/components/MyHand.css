@@ -1,0 +1,173 @@
+.you {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.player-cards-container {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 0 10px;
+}
+.you-main-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.you-secrets {
+  position: absolute;
+  left: 10px;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 5px;
+  z-index: 100;
+}
+
+.secrets-list {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+}
+
+.you-sets {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.you-hand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  position: relative;
+}
+
+.you-hand.compact .card {
+  margin-left: -20px;
+}
+
+.you-hand.compact .card:first-child {
+  margin-left: 0;
+}
+
+.you-hand.compact .card:hover {
+  transform: translateY(-20px);
+}
+
+.you-hand .card {
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.you-hand .card.selected {
+  transform: translateY(-20px);
+  box-shadow: 0px 0px 15px rgba(90, 0, 0, 0.9);
+}
+
+.you-hand.expanded {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0 !important;
+  gap: 10px;
+  padding: 20px;
+  border-radius: 10px;
+  max-width: 90vw;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  z-index: 2000;
+}
+
+.you-hand.expanded .card {
+  margin: 0;
+  box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.8);
+}
+
+.you-hand.expanded .card:hover {
+  transform: scale(1.1);
+  z-index: 2001;
+}
+
+.hand-toggle-button {
+  bottom: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 101;
+  background-color: transparent;
+  backdrop-filter: blur(6px);
+  border-color: #fff;
+}
+
+.you-name.selectable {
+  cursor: pointer;
+}
+
+.you-name.selected {
+  text-decoration: underline;
+}
+
+.you-secrets .secret.clickable {
+  cursor: pointer;
+}
+
+.you-secrets .secret.clickable:hover:not(.selected) {
+  box-shadow: 0 0 5px 2px rgba(255, 221, 0, 0.7);
+}
+
+.you-secrets .secret.selected {
+  --selection-color: #00ff00;
+  box-shadow: 0 0 12px 6px var(--selection-color);
+  border: 3px solid var(--selection-color);
+  transform: scale(1.05);
+  transition: all 0.2s ease-in-out;
+}
+
+.social-disgrace-banner {
+  color: #f0f0f0;
+  padding: 3px 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid #ffaaaa;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+  backdrop-filter: blur(10px);
+}
+
+.you-name {
+  color: #fff;
+  font-weight: 700;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  justify-self: center;
+  margin-bottom: 10px;
+}
+
+.you-name.myturn {
+  text-shadow: 0 0 100px rgb(119, 0, 0);
+  font-weight: 900;
+  color: #ffd166;
+  text-shadow: 0 0 12px rgba(255, 209, 102, 0.75);
+  font-weight: 900;
+}

@@ -1,0 +1,47 @@
+.decks {
+  display: flex;
+  flex-direction: row;
+  gap: 18px;
+  align-items: center;
+  justify-content: center;
+}
+
+.deck {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  position: relative;
+}
+
+.card-counter {
+  position: absolute;
+  top: -0.8rem;
+  left: -0.8rem;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 1.8rem;
+  height: 1.8rem;
+
+  background-color: #1a1a1a;
+  color: white;
+  border-radius: 50%;
+  border: 2px solid white;
+
+  font-size: 14px;
+  font-weight: bold;
+
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+  z-index: 2;
+}
+
+.deck.discard-deck {
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  margin-top: 0;
+}
+.deck.discard-deck:hover {
+  transform: scale(1.03);
+}
