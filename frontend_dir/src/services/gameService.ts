@@ -43,6 +43,9 @@ async function createGame(game: Game): Promise<GameResponse> {
 }
 
 async function getGames(): Promise<GameResponse[]> {
+  console.log("DEBUG URL:", httpServerUrl); 
+  console.log("DEBUG FULL URL:", `${httpServerUrl}/games`);
+  
   const response = await fetch(`${httpServerUrl}/games`, {
     method: "GET",
   });

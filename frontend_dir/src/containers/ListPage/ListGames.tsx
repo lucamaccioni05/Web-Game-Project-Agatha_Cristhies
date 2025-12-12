@@ -3,6 +3,8 @@ import Button from "../../components/Button";
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import destinations from "../../navigation/destinations";
+import { httpServerUrl } from "../../services/config";
+
 
 import type { Game, GameResponse } from "../../services/gameService";
 import playerService from "../../services/playerService";
@@ -16,7 +18,8 @@ export default function ListGames() {
   const { playerName, playerDate, playerAvatar } = location.state || {};
 
   useEffect(() => {
-    const wsURL = "ws://localhost:8000/ws/games/availables";
+    // const wsURLs = 'ws://localhost:8000/ws/games/availables';
+    const wsURL = `${httpServerUrl.replace("http", "ws")}/ws/games/availables`;
     const ws = new WebSocket(wsURL);
 
     ws.onopen = () => {
